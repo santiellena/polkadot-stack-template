@@ -52,8 +52,8 @@ A Rust CLI tool using [subxt](https://github.com/parity-tech/subxt) for chain in
 
 ### Deployment Scripts
 
-- [`scripts/start-dev.sh`](scripts/start-dev.sh) - Build runtime and start local node
-- [`scripts/start-dev-with-contracts.sh`](scripts/start-dev-with-contracts.sh) - Build, start node, compile and deploy contracts
+- [`scripts/start-dev.sh`](scripts/start-dev.sh) - Build runtime, start local node + eth-rpc adapter
+- [`scripts/start-dev-with-contracts.sh`](scripts/start-dev-with-contracts.sh) - All of the above + compile and deploy both contracts
 - [`scripts/deploy-paseo.sh`](scripts/deploy-paseo.sh) - Deploy contracts to Polkadot TestNet
 - [`blockchain/Dockerfile`](blockchain/Dockerfile) - Docker image using polkadot-omni-node
 - [`blockchain/zombienet.toml`](blockchain/zombienet.toml) - Zombienet config for multi-node testing
@@ -65,6 +65,7 @@ A Rust CLI tool using [subxt](https://github.com/parity-tech/subxt) for chain in
 - **Rust** (stable, installed via [rustup](https://rustup.rs/))
 - **Node.js** v22.5+ and npm v10.9.0+
 - **polkadot-omni-node** v1.21.3 ([download](https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2512-3))
+- **eth-rpc** v0.12.0 ([download](https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2512-3)) - Ethereum JSON-RPC adapter
 - **chain-spec-builder** (`cargo install staging-chain-spec-builder`)
 
 See [INSTALL.md](INSTALL.md) for detailed setup instructions.
@@ -72,8 +73,10 @@ See [INSTALL.md](INSTALL.md) for detailed setup instructions.
 ### Run locally
 
 ```bash
-# Start the local dev chain
+# Start the local dev chain (node + eth-rpc adapter)
 ./scripts/start-dev.sh
+# Substrate RPC: ws://127.0.0.1:9944
+# Ethereum RPC:  http://127.0.0.1:8545
 
 # In another terminal, start the frontend
 cd web && npm install && npm run dev
@@ -135,6 +138,7 @@ polkadot-stack-template/
 |---|---|
 | polkadot-sdk | stable2512-3 (umbrella crate v2512.3.3) |
 | polkadot-omni-node | v1.21.3 (from stable2512-3 release) |
+| eth-rpc | v0.12.0 (Ethereum JSON-RPC adapter) |
 | pallet-revive | v0.12.2 (EVM + PVM smart contracts) |
 | Solidity | v0.8.28 |
 | resolc | v1.0.0 |

@@ -161,9 +161,12 @@ npm install
 ./scripts/start-dev.sh
 ```
 
-This builds the runtime, generates a chain spec, and starts the omni-node in dev mode. The node produces blocks at ~3 second intervals with the Alice dev account as the authority.
+This builds the runtime, generates a chain spec, and starts both the omni-node and the eth-rpc adapter. The node produces blocks at ~3 second intervals.
 
 - **Substrate RPC**: `ws://127.0.0.1:9944`
+- **Ethereum RPC**: `http://127.0.0.1:8545` (via eth-rpc adapter)
+
+The Ethereum RPC endpoint is compatible with MetaMask, Hardhat, ethers.js, and all standard Ethereum tooling.
 
 ### With Contract Deployment
 
@@ -171,7 +174,7 @@ This builds the runtime, generates a chain spec, and starts the omni-node in dev
 ./scripts/start-dev-with-contracts.sh
 ```
 
-Same as above, plus compiles and deploys the Counter contract to both EVM and PVM backends.
+Same as above, plus compiles and deploys the Counter contract to both EVM (solc) and PVM (resolc) backends. You'll see both deployed contract addresses in the output.
 
 ### Frontend
 
