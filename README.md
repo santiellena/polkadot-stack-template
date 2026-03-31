@@ -58,6 +58,7 @@ A Rust CLI tool using [subxt](https://github.com/parity-tech/subxt) and [alloy](
 
 ### Deployment
 
+- [`scripts/start-all.sh`](scripts/start-all.sh) - Build runtime, deploy contracts, and start frontend — one command quick start
 - [`scripts/start-dev.sh`](scripts/start-dev.sh) - Build runtime, start local node
 - [`scripts/start-dev-with-contracts.sh`](scripts/start-dev-with-contracts.sh) - All of the above + compile and deploy both contracts
 - [`scripts/deploy-paseo.sh`](scripts/deploy-paseo.sh) - Deploy contracts to Polkadot TestNet
@@ -82,13 +83,24 @@ See [INSTALL.md](INSTALL.md) for detailed setup instructions.
 ### Run locally
 
 ```bash
-# Start the local dev chain (node + eth-rpc adapter)
-./scripts/start-dev.sh
+# Start everything: node, contracts, and frontend in one command
+./scripts/start-all.sh
 # Substrate RPC: ws://127.0.0.1:9944
 # Ethereum RPC:  http://127.0.0.1:8545
+# Frontend:      http://localhost:5173
+```
+
+Or run components individually:
+
+```bash
+# Start just the dev chain
+./scripts/start-dev.sh
+
+# Start chain + compile and deploy contracts
+./scripts/start-dev-with-contracts.sh
 
 # In another terminal, start the frontend
-cd web && npm install && npm run dev
+./scripts/start-frontend.sh
 
 # Or use the CLI
 cargo run -p stack-cli -- chain info

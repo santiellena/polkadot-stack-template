@@ -18103,6 +18103,7 @@ name = "stack-cli"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "bip39",
  "blake2 0.10.6",
  "clap",
  "hex",

@@ -78,25 +78,27 @@ Upload `web/dist/` to Vercel, Netlify, Cloudflare Pages, S3, or any static file 
 
 ### Local dev node
 
-Start the local chain with eth-rpc adapter, then deploy:
+The quickest way to get everything running (node, contracts, and frontend):
 
 ```bash
-# Start node + eth-rpc (terminal 1)
-./scripts/start-dev.sh
-# Then in another terminal, start eth-rpc:
-eth-rpc --dev
-
-# Deploy EVM contract
-cd contracts/evm && npm install && npm run deploy:local
-
-# Deploy PVM contract
-cd contracts/pvm && npm install && npm run deploy:local
+./scripts/start-all.sh
 ```
 
-Or use the all-in-one script that starts the node and deploys both contracts:
+Or start the node and deploy contracts without the frontend:
 
 ```bash
 ./scripts/start-dev-with-contracts.sh
+```
+
+Or deploy contracts manually against a running node:
+
+```bash
+# Start node (terminal 1)
+./scripts/start-dev.sh
+
+# Deploy contracts (terminal 2)
+cd contracts/evm && npm install && npm run deploy:local
+cd contracts/pvm && npm install && npm run deploy:local
 ```
 
 Deploy scripts automatically write contract addresses to `deployments.json` (for CLI) and `web/src/config/deployments.ts` (for frontend). The frontend contract pages will auto-populate the address field.

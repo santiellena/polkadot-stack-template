@@ -158,42 +158,39 @@ npm install
 ### Quick Start
 
 ```bash
-./scripts/start-dev.sh
+./scripts/start-all.sh
 ```
 
-This builds the runtime, generates a chain spec, and starts both the omni-node and the eth-rpc adapter. The node produces blocks at ~3 second intervals.
+This builds the runtime, generates a chain spec, starts the omni-node and eth-rpc adapter, compiles and deploys both contracts, and starts the frontend — all in one command.
 
 - **Substrate RPC**: `ws://127.0.0.1:9944`
 - **Ethereum RPC**: `http://127.0.0.1:8545` (via eth-rpc adapter)
+- **Frontend**: `http://localhost:5173`
+
+Press Ctrl+C to stop everything.
+
+### Running Components Individually
+
+```bash
+# Node only (no contracts, no frontend)
+./scripts/start-dev.sh
+
+# Node + compile and deploy contracts
+./scripts/start-dev-with-contracts.sh
+
+# Frontend (requires node already running)
+./scripts/start-frontend.sh
+```
 
 The Ethereum RPC endpoint is compatible with MetaMask, Hardhat, ethers.js, and all standard Ethereum tooling.
-
-### With Contract Deployment
-
-```bash
-./scripts/start-dev-with-contracts.sh
-```
-
-Same as above, plus compiles and deploys the ProofOfExistence contract to both EVM (solc) and PVM (resolc) backends. You'll see both deployed contract addresses in the output.
-
-### Frontend
-
-With the node running:
-```bash
-cd web
-npm install
-npm run dev
-```
-
-Opens at `http://localhost:5173`.
 
 ### CLI
 
 ```bash
-cargo run -p stack-cli -- chain info --url ws://127.0.0.1:9944
-cargo run -p stack-cli -- pallet get alice
-cargo run -p stack-cli -- pallet set 42
-cargo run -p stack-cli -- pallet increment
+cargo run -p stack-cli -- chain info
+cargo run -p stack-cli -- pallet create-claim --file ./README.md
+cargo run -p stack-cli -- pallet list-claims
+cargo run -p stack-cli -- contract create-claim evm --file ./README.md
 ```
 
 > Note: The CLI is excluded from the main workspace to avoid dependency conflicts. Build it separately with `cd cli && cargo build`.
