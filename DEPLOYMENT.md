@@ -170,7 +170,7 @@ cargo run -p stack-cli -- pallet create-claim --file ./document.pdf --upload
 cargo run -p stack-cli -- contract create-claim evm --file ./document.pdf --upload
 ```
 
-The CLI connects to the Bulletin Chain via subxt and submits `TransactionStorage.store()` signed by Alice.
+The CLI connects to the Bulletin Chain via subxt and submits `TransactionStorage.store()`.
 
 **Notes:**
 - Files expire after ~7 days unless renewed
@@ -179,27 +179,42 @@ The CLI connects to the Bulletin Chain via subxt and submits `TransactionStorage
 
 ## CLI
 
-The CLI reads contract addresses from `deployments.json` in the project root. After deploying contracts, it works immediately:
+The CLI reads contract addresses from `deployments.json` in the project root. After deploying contracts, it works immediately.
+
+### Signer options
+
+All write commands accept `--signer` (`-s`) which auto-detects the format:
+
+```bash
+--signer alice                              # dev account name
+--signer "bottom drive obey lake ..."       # mnemonic phrase
+--signer 0x5fb92d6e98884f76de468fa3f...     # raw secret seed
+```
+
+Default is `alice` if omitted.
+
+### Commands
 
 ```bash
 # Chain info
 cargo run -p stack-cli -- chain info
 
 # Pallet interaction (via Substrate RPC)
-cargo run -p stack-cli -- pallet create-claim 0x0123...def      # direct hash
-cargo run -p stack-cli -- pallet create-claim --file ./doc.pdf  # hash a file
-cargo run -p stack-cli -- pallet create-claim --file ./doc.pdf --upload  # hash + IPFS upload
+cargo run -p stack-cli -- pallet create-claim 0x0123...def                  # direct hash
+cargo run -p stack-cli -- pallet create-claim --file ./doc.pdf              # hash a file
+cargo run -p stack-cli -- pallet create-claim --file ./doc.pdf --upload     # hash + IPFS upload
+cargo run -p stack-cli -- pallet create-claim --file ./doc.pdf -s bob       # custom signer
 cargo run -p stack-cli -- pallet get-claim 0x0123...
 cargo run -p stack-cli -- pallet list-claims
-cargo run -p stack-cli -- pallet revoke-claim 0x0123...
+cargo run -p stack-cli -- pallet revoke-claim 0x0123... -s alice
 
 # Contract interaction (via eth-rpc)
 cargo run -p stack-cli -- contract info
-cargo run -p stack-cli -- contract create-claim evm 0x0123...           # direct hash
-cargo run -p stack-cli -- contract create-claim evm --file ./doc.pdf   # hash a file
-cargo run -p stack-cli -- contract create-claim pvm --file ./doc.pdf --upload --signer bob
+cargo run -p stack-cli -- contract create-claim evm 0x0123...               # direct hash
+cargo run -p stack-cli -- contract create-claim evm --file ./doc.pdf        # hash a file
+cargo run -p stack-cli -- contract create-claim pvm --file ./doc.pdf --upload -s bob
 cargo run -p stack-cli -- contract get-claim evm 0x0123...
-cargo run -p stack-cli -- contract revoke-claim pvm 0x0123... --signer bob
+cargo run -p stack-cli -- contract revoke-claim pvm 0x0123... -s bob
 ```
 
 Use `--url` and `--eth-rpc-url` flags to target different endpoints:
