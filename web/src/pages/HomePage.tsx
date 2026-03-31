@@ -76,9 +76,11 @@ export default function HomePage() {
     [setConnected, setPallets]
   );
 
-  // Connect on mount
+  // Connect on mount (skip if already connected to the same URL)
   useEffect(() => {
-    connect(wsUrl);
+    if (!connected) {
+      connect(wsUrl);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to blocks when connected
