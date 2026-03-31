@@ -71,11 +71,7 @@ runtime-benchmarks = [
 	"cumulus-pallet-parachain-system/runtime-benchmarks",
 	"hex-literal",
 	"pallet-template/runtime-benchmarks",
-	# Enable runtime-benchmarks selectively to avoid pallet-revive-fixtures build issues.
-	# polkadot-sdk/runtime-benchmarks enables ALL pallets including pallet-revive which
-	# requires a nightly toolchain for fixture compilation.
-	"polkadot-sdk/frame-benchmarking",
-	"polkadot-sdk/frame-system-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [
 	"cumulus-pallet-parachain-system/try-runtime",
