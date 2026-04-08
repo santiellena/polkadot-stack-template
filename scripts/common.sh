@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Shared helpers for the repo's two supported local topologies:
+# - Solo dev mode (`start-dev.sh`) for the fastest runtime/pallet loop
+# - Relay-backed Zombienet mode (`start-all.sh`, `start-local.sh`) for the full feature set
+
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$COMMON_DIR/.." && pwd)"
 CHAIN_SPEC="$ROOT_DIR/blockchain/chain_spec.json"
@@ -17,9 +21,45 @@ NODE_LOG="${NODE_LOG:-}"
 NODE_PID="${NODE_PID:-}"
 ETH_RPC_PID="${ETH_RPC_PID:-}"
 
+log_info() {
+    echo "INFO: $*"
+}
+
+log_warn() {
+    echo "WARN: $*"
+}
+
+log_error() {
+    echo "ERROR: $*" >&2
+}
+
+install_hint() {
+    case "$1" in
+        cargo)
+            echo "Install Rust via rustup: https://rustup.rs/"
+            ;;
+        chain-spec-builder)
+            echo "Install with: cargo install staging-chain-spec-builder"
+            ;;
+        zombienet)
+            echo "Install with: npm install -g @zombienet/cli"
+            ;;
+        polkadot|polkadot-omni-node|eth-rpc)
+            echo "See INSTALL.md for the matching stable2512-3 binary install steps."
+            ;;
+        curl)
+            echo "Install curl with your system package manager."
+            ;;
+        *)
+            echo "See INSTALL.md for setup guidance."
+            ;;
+    esac
+}
+
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
-        echo "ERROR: Missing required command: $1" >&2
+        log_error "Missing required command: $1"
+        log_info "$(install_hint "$1")"
         exit 1
     fi
 }
@@ -27,9 +67,9 @@ require_command() {
 require_port_free() {
     local port="$1"
     if lsof -i :"$port" >/dev/null 2>&1; then
-        echo "ERROR: Port $port is already in use." >&2
+        log_error "Port $port is already in use."
         lsof -i :"$port" 2>/dev/null | head -5 >&2
-        echo "Kill the process above or choose a different port." >&2
+        log_info "Stop the process above or choose a different port before retrying."
         exit 1
     fi
 }
@@ -94,19 +134,20 @@ wait_for_substrate_rpc() {
     local startup_log
     startup_log="$(startup_log_path)"
 
-    echo "  Waiting for local node..."
+    log_info "Waiting for local node RPCs..."
     for _ in $(seq 1 120); do
         if [ -n "$NODE_PID" ] && basic_substrate_rpc_ready && substrate_block_producing; then
-            echo "  Node ready ($SUBSTRATE_RPC_WS)"
+            log_info "Node ready at $SUBSTRATE_RPC_WS"
             return 0
         fi
         if [ -n "$ZOMBIE_PID" ] && substrate_statement_store_ready && substrate_block_producing; then
-            echo "  Node ready ($SUBSTRATE_RPC_WS, Statement Store RPCs enabled)"
+            log_info "Node ready at $SUBSTRATE_RPC_WS (Statement Store RPCs enabled)"
             return 0
         fi
         if startup_service_stopped; then
-            echo "  ERROR: Local node stopped during startup."
+            log_error "Local node stopped during startup."
             if [ -n "$startup_log" ] && [ -f "$startup_log" ]; then
+                log_info "Recent log output:"
                 tail -n 100 "$startup_log" || true
             fi
             return 1
@@ -114,8 +155,9 @@ wait_for_substrate_rpc() {
         sleep 1
     done
 
-    echo "  ERROR: Local node RPCs did not become ready in time."
+    log_error "Local node RPCs did not become ready in time."
     if [ -n "$startup_log" ] && [ -f "$startup_log" ]; then
+        log_info "Recent log output:"
         tail -n 100 "$startup_log" || true
     fi
     return 1
@@ -143,15 +185,16 @@ wait_for_eth_rpc() {
         eth_rpc_log="$ZOMBIE_DIR/eth-rpc.log"
     fi
 
-    echo "  Waiting for Ethereum RPC..."
+    log_info "Waiting for Ethereum RPC..."
     for _ in $(seq 1 120); do
         if eth_rpc_ready && { [ -n "$NODE_PID" ] || eth_rpc_block_producing; }; then
-            echo "  Ethereum RPC ready ($ETH_RPC_HTTP)"
+            log_info "Ethereum RPC ready at $ETH_RPC_HTTP"
             return 0
         fi
         if [ -n "$ETH_RPC_PID" ] && ! kill -0 "$ETH_RPC_PID" 2>/dev/null; then
-            echo "  ERROR: eth-rpc stopped during startup."
+            log_error "eth-rpc stopped during startup."
             if [ -f "$eth_rpc_log" ]; then
+                log_info "Recent log output:"
                 tail -n 100 "$eth_rpc_log" || true
             fi
             return 1
@@ -159,8 +202,9 @@ wait_for_eth_rpc() {
         sleep 1
     done
 
-    echo "  ERROR: Ethereum RPC did not become ready in time."
+    log_error "Ethereum RPC did not become ready in time."
     if [ -f "$eth_rpc_log" ]; then
+        log_info "Recent log output:"
         tail -n 100 "$eth_rpc_log" || true
     fi
     return 1
@@ -181,8 +225,8 @@ start_zombienet_background() {
     ) &
     ZOMBIE_PID=$!
 
-    echo "  Zombienet dir: $ZOMBIE_DIR"
-    echo "  Zombienet log: $ZOMBIE_LOG"
+    log_info "Zombienet data dir: $ZOMBIE_DIR"
+    log_info "Zombienet log: $ZOMBIE_LOG"
 }
 
 start_local_node_background() {
@@ -205,7 +249,7 @@ start_local_node_background() {
         -- >"$NODE_LOG" 2>&1 &
     NODE_PID=$!
 
-    echo "  Node log: $NODE_LOG"
+    log_info "Node log: $NODE_LOG"
 }
 
 run_local_node_foreground() {
@@ -234,8 +278,8 @@ run_zombienet_foreground() {
     ZOMBIE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/polkadot-stack-zombienet.XXXXXX")"
     ZOMBIE_LOG="$ZOMBIE_DIR/zombienet.log"
 
-    echo "  Zombienet dir: $ZOMBIE_DIR"
-    echo "  Zombienet log: $ZOMBIE_LOG"
+    log_info "Zombienet data dir: $ZOMBIE_DIR"
+    log_info "Zombienet log: $ZOMBIE_LOG"
 
     trap cleanup_zombienet EXIT INT TERM
 
@@ -266,7 +310,7 @@ start_eth_rpc_background() {
         -d "$eth_rpc_dir" >"$eth_rpc_log" 2>&1 &
     ETH_RPC_PID=$!
 
-    echo "  eth-rpc log: $eth_rpc_log"
+    log_info "eth-rpc log: $eth_rpc_log"
 }
 
 cleanup_local_node() {

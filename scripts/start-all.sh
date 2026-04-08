@@ -25,9 +25,11 @@ trap cleanup EXIT INT TERM
 
 echo "=== Polkadot Stack Template - Full Local Stack ==="
 echo ""
-echo "  This is the recommended one-command path."
-echo "  It uses Zombienet (relay chain + parachain) so all examples work,"
-echo "  including Statement Store."
+log_info "This is the recommended one-command path."
+log_info "It uses Zombienet (relay chain + parachain) so all examples work,"
+log_info "including Statement Store."
+log_info "First run can take 5-10 minutes because it installs npm dependencies,"
+log_info "compiles contracts, and waits for the relay-backed network to come up."
 echo ""
 
 echo "[1/8] Building runtime..."
@@ -42,8 +44,8 @@ cd "$ROOT_DIR/contracts/pvm" && npm install --silent && npx hardhat compile
 cd "$ROOT_DIR"
 
 echo "[4/8] Starting Zombienet (relay chain + parachain)..."
-echo "  This takes longer than dev mode because the relay chain must finalize"
-echo "  and the parachain must register before the collator starts authoring."
+log_info "This takes longer than dev mode because the relay chain must finalize"
+log_info "and the parachain must register before the collator starts authoring."
 start_zombienet_background
 wait_for_substrate_rpc
 
@@ -70,30 +72,25 @@ cd "$ROOT_DIR/web"
 npm install
 
 if curl -s -o /dev/null http://127.0.0.1:9944 2>/dev/null; then
-    echo "  Updating PAPI descriptors..."
+    log_info "Updating PAPI descriptors..."
     npm run update-types
     npm run codegen
 fi
 
 npm run dev &
 FRONTEND_PID=$!
-echo "  Frontend starting (http://localhost:5173)"
+log_info "Frontend starting at http://localhost:5173"
 
 cd "$ROOT_DIR"
 
 echo ""
 echo "=== Full local stack running ==="
-echo "  Substrate RPC:    ws://127.0.0.1:9944"
-echo "  Ethereum RPC:     http://127.0.0.1:8545"
-echo "  Frontend:         http://localhost:5173"
-echo "  Zombienet dir:    $ZOMBIE_DIR"
+log_info "Substrate RPC: ws://127.0.0.1:9944"
+log_info "Ethereum RPC:  http://127.0.0.1:8545"
+log_info "Frontend:      http://localhost:5173"
+log_info "Zombienet dir: $ZOMBIE_DIR"
 echo ""
-echo "  Included examples:"
-echo "    - PoE Pallet"
-echo "    - PoE EVM Contract"
-echo "    - PoE PVM Contract"
-echo "    - Statement Store"
-echo "    - Bulletin Chain upload"
+log_info "Included examples: PoE pallet, EVM contract, PVM contract, Statement Store, Bulletin upload"
 echo ""
-echo "Press Ctrl+C to stop all."
+log_info "Press Ctrl+C to stop all."
 wait "$ZOMBIE_PID"
