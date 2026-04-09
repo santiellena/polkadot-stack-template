@@ -46,9 +46,9 @@ The domain basename is entered when you dispatch the workflow. Domain registrati
 
 **Configuration:**
 
-- Set the `DOTNS_MNEMONIC` secret in your repo settings before running the workflow
 - Open **Actions > Deploy Frontend to DotNS > Run workflow**
-- Enter the DotNS basename you want to register or update
+- Enter a unique DotNS basename (lowercase, 9+ letters followed by exactly 2 digits, e.g. `my-cool-project42`)
+- The workflow uses Alice's dev account by default, which works for free registration on Paseo testnet. To use your own account, set the `DOTNS_MNEMONIC` secret in your repo settings.
 
 **Local IPFS deployment:**
 
