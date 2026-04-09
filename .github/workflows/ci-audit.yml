@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo install cargo-audit
-      - run: cargo audit
+      - run: cargo audit --ignore RUSTSEC-2025-0009 # ring 0.16.20 via polkadot-sdk; can't upgrade
 
   npm:
     name: npm audit (${{ matrix.dir }})
