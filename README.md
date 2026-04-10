@@ -51,9 +51,9 @@ More: [`scripts/README.md`](scripts/README.md)
 docker compose up -d
 
 # Deploy contracts and start the frontend on the host
-cd contracts/evm && npm install && npm run deploy:local
-cd contracts/pvm && npm install && npm run deploy:local
-cd web && npm install && npm run dev
+(cd contracts/evm && npm install && npm run deploy:local)
+(cd contracts/pvm && npm install && npm run deploy:local)
+(cd web && npm install && npm run dev)
 # Frontend: http://127.0.0.1:5173
 ```
 
@@ -67,7 +67,7 @@ Only Node.js is needed on the host. The Docker build compiles the Rust runtime a
 - **polkadot-omni-node** v1.21.3 ([download](https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2512-3))
 - **eth-rpc** v0.12.0 ([download](https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2512-3)) - Ethereum JSON-RPC adapter
 - **zombienet** v1.3.138 (`npm install -g @zombienet/cli`) for the local relay-chain + collator topology
-- **chain-spec-builder** (`cargo install staging-chain-spec-builder`)
+- **chain-spec-builder** v17.0.0 (`cargo install staging-chain-spec-builder`)
 
 See [docs/INSTALL.md](docs/INSTALL.md) for detailed setup instructions.
 
@@ -150,9 +150,13 @@ cd contracts/pvm && npx hardhat test
 | Component | Version |
 |---|---|
 | polkadot-sdk | stable2512-3 (umbrella crate v2512.3.3) |
+| polkadot | v1.21.3 (relay chain binary) |
 | polkadot-omni-node | v1.21.3 (from stable2512-3 release) |
 | eth-rpc | v0.12.0 (Ethereum JSON-RPC adapter) |
+| chain-spec-builder | v17.0.0 |
+| zombienet | v1.3.138 (@zombienet/cli) |
 | pallet-revive | v0.12.2 (EVM + PVM smart contracts) |
+| Node.js | 22.x LTS |
 | Solidity | v0.8.28 |
 | resolc | v1.0.0 |
 | PAPI | v1.23.3 |
