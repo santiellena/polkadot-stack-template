@@ -90,18 +90,20 @@ cargo install --git https://github.com/paritytech/polkadot-sdk --tag polkadot-st
 
 Building `polkadot` from source produces the worker binaries alongside it.
 
-**Verify versions:**
+**Verify versions** (from the repository root, using the downloaded binaries):
 
 ```bash
-polkadot --version
+./bin/polkadot --version
 # polkadot 1.21.3-...
 
-polkadot-omni-node --version
+./bin/polkadot-omni-node --version
 # polkadot-omni-node 1.21.3-...
 
-eth-rpc --version
+./bin/eth-rpc --version
 # pallet-revive-eth-rpc 0.12.0
 ```
+
+If `./bin` is on your `PATH` (as when running `./scripts/start-all.sh` or after `export PATH="$(pwd)/bin:$PATH"`), you can call `polkadot --version` etc. without the prefix.
 
 > **Warning**: Using an older omni-node (e.g. v1.18.5 from an older SDK) can crash with errors such as "Missing required set_validation_data inherent" or missing worker binaries.
 
@@ -352,10 +354,10 @@ The `polkadot` binary requires `polkadot-prepare-worker` and `polkadot-execute-w
 
 ### Parachain stalls at block 0 on Zombienet
 
-All binaries (`polkadot`, `polkadot-omni-node`, `eth-rpc`) must be from the same SDK release. A version mismatch (e.g., `polkadot` 1.15.0 with `polkadot-omni-node` 1.21.3) causes the collator to fail to advertise collations to relay chain validators. Verify with:
+All binaries (`polkadot`, `polkadot-omni-node`, `eth-rpc`) must be from the same SDK release. A version mismatch (e.g., `polkadot` 1.15.0 with `polkadot-omni-node` 1.21.3) causes the collator to fail to advertise collations to relay chain validators. Verify with (repo root, after `./scripts/download-sdk-binaries.sh`):
 ```bash
-polkadot --version
-polkadot-omni-node --version
+./bin/polkadot --version
+./bin/polkadot-omni-node --version
 # Both should show 1.21.3
 ```
 
