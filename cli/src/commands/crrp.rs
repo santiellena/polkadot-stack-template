@@ -1,3 +1,4 @@
+use crate::commands::config::{load_repo_config, read_repo_id_if_exists, RepoConfig};
 use alloy::{
 	primitives::{Address, FixedBytes},
 	providers::ProviderBuilder,
@@ -13,6 +14,9 @@ use std::{
 	process::Command,
 	time::{SystemTime, UNIX_EPOCH},
 };
+
+const DEFAULT_WALLET_CHAIN: &str = "polkadot:91b171bb158e2d3848fa23a9f1c25182";
+const DEFAULT_ETH_RPC_HTTP: &str = "http://127.0.0.1:8545";
 
 sol! {
 	#[sol(rpc)]
@@ -63,19 +67,18 @@ pub struct CrrpCommonArgs {
 	/// Use local mock backend instead of eth-rpc contract reads/writes.
 	#[arg(long, env = "CRRP_MOCK", default_value_t = false)]
 	pub mock: bool,
+	/// Allow running CRRP commands outside main branch (testing only).
+	#[arg(long, env = "CRRP_ALLOW_NON_MAIN", default_value_t = false)]
+	pub allow_non_main: bool,
 	/// Wallet backend for signature-requiring CRRP commands.
-	#[arg(long, value_enum, default_value_t = WalletBackend::Pwallet)]
-	pub wallet_backend: WalletBackend,
+	#[arg(long, value_enum)]
+	pub wallet_backend: Option<WalletBackend>,
 	/// WalletConnect cloud project id (required for pwallet backend).
 	#[arg(long, env = "CRRP_WALLETCONNECT_PROJECT_ID")]
 	pub wallet_project_id: Option<String>,
 	/// CAIP-2 chain id for WalletConnect session namespace.
-	#[arg(
-		long,
-		env = "CRRP_WALLETCONNECT_CHAIN",
-		default_value = "polkadot:91b171bb158e2d3848fa23a9f1c25182"
-	)]
-	pub wallet_chain: String,
+	#[arg(long, env = "CRRP_WALLETCONNECT_CHAIN")]
+	pub wallet_chain: Option<String>,
 }
 
 #[derive(Args)]
@@ -241,18 +244,17 @@ struct PwalletBridgeEnsureSession {
 
 pub async fn run(
 	action: CrrpAction,
-	_ws_url: &str,
-	_eth_rpc_url: &str,
+	eth_rpc_url_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	match action {
-		CrrpAction::Propose(args) => run_propose(args, _eth_rpc_url).await?,
-		CrrpAction::Fetch(args) => run_fetch(args, _eth_rpc_url).await?,
-		CrrpAction::Review(args) => run_review(args, _eth_rpc_url).await?,
-		CrrpAction::Merge(args) => run_merge(args, _eth_rpc_url).await?,
-		CrrpAction::Release(args) => run_release(args, _eth_rpc_url).await?,
-		CrrpAction::Status(args) => run_status(args, _eth_rpc_url).await?,
-		CrrpAction::Repo(args) => run_repo(args, _eth_rpc_url).await?,
-		CrrpAction::Proposals(args) => run_proposals(args, _eth_rpc_url).await?,
+		CrrpAction::Propose(args) => run_propose(args, eth_rpc_url_override).await?,
+		CrrpAction::Fetch(args) => run_fetch(args, eth_rpc_url_override).await?,
+		CrrpAction::Review(args) => run_review(args, eth_rpc_url_override).await?,
+		CrrpAction::Merge(args) => run_merge(args, eth_rpc_url_override).await?,
+		CrrpAction::Release(args) => run_release(args, eth_rpc_url_override).await?,
+		CrrpAction::Status(args) => run_status(args, eth_rpc_url_override).await?,
+		CrrpAction::Repo(args) => run_repo(args, eth_rpc_url_override).await?,
+		CrrpAction::Proposals(args) => run_proposals(args, eth_rpc_url_override).await?,
 	}
 
 	Ok(())
@@ -260,9 +262,9 @@ pub async fn run(
 
 async fn run_propose(
 	args: ProposeArgs,
-	eth_rpc_url: &str,
+	eth_rpc_url_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
 		ensure_wallet_session(&ctx, "proposal submission")?;
 	}
@@ -295,8 +297,11 @@ async fn run_propose(
 	Ok(())
 }
 
-async fn run_fetch(args: FetchArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+async fn run_fetch(
+	args: FetchArgs,
+	eth_rpc_url_override: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	let into = args
 		.into
 		.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
@@ -308,8 +313,11 @@ async fn run_fetch(args: FetchArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std
 	Ok(())
 }
 
-async fn run_review(args: ReviewArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+async fn run_review(
+	args: ReviewArgs,
+	eth_rpc_url_override: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	ensure_wallet_session(&ctx, "review submission")?;
 	println!("Reviewing proposal {}...", args.proposal_id);
 	println!("Repository: {}", ctx.repo_root.display());
@@ -322,8 +330,11 @@ async fn run_review(args: ReviewArgs, eth_rpc_url: &str) -> Result<(), Box<dyn s
 	Ok(())
 }
 
-async fn run_merge(args: MergeArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+async fn run_merge(
+	args: MergeArgs,
+	eth_rpc_url_override: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
 		ensure_wallet_session(&ctx, "proposal merge")?;
 	}
@@ -362,9 +373,9 @@ async fn run_merge(args: MergeArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std
 
 async fn run_release(
 	args: ReleaseArgs,
-	eth_rpc_url: &str,
+	eth_rpc_url_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
 		ensure_wallet_session(&ctx, "release creation")?;
 	}
@@ -386,8 +397,11 @@ async fn run_release(
 	Ok(())
 }
 
-async fn run_status(args: StatusArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+async fn run_status(
+	args: StatusArgs,
+	eth_rpc_url_override: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	let branch = git_output(&ctx.repo_root, &["rev-parse", "--abbrev-ref", "HEAD"])?;
 	let local_head = git_output(&ctx.repo_root, &["rev-parse", "HEAD"])?;
 
@@ -406,8 +420,11 @@ async fn run_status(args: StatusArgs, eth_rpc_url: &str) -> Result<(), Box<dyn s
 	Ok(())
 }
 
-async fn run_repo(args: RepoArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+async fn run_repo(
+	args: RepoArgs,
+	eth_rpc_url_override: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	println!("CRRP Repo (skeleton)");
 	println!("Backend: {}", if ctx.backend == Backend::Mock { "mock" } else { "rpc" });
 	println!("Repository: {}", ctx.repo_root.display());
@@ -424,9 +441,9 @@ async fn run_repo(args: RepoArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::
 
 async fn run_proposals(
 	args: ProposalsArgs,
-	eth_rpc_url: &str,
+	eth_rpc_url_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let ctx = preflight(&args.common, eth_rpc_url).await?;
+	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	println!("CRRP Proposals (skeleton)");
 	println!("Backend: {}", if ctx.backend == Backend::Mock { "mock" } else { "rpc" });
 	println!("Repository: {}", ctx.repo_root.display());
@@ -444,20 +461,39 @@ async fn run_proposals(
 
 async fn preflight(
 	common: &CrrpCommonArgs,
-	eth_rpc_url: &str,
+	eth_rpc_url_override: Option<&str>,
 ) -> Result<CrrpContext, Box<dyn std::error::Error>> {
 	let repo_root = detect_repo_root(common.repo.as_deref())?;
+	let repo_config = load_repo_config(&repo_root)?;
 	let branch = git_output(&repo_root, &["rev-parse", "--abbrev-ref", "HEAD"])?;
-	if branch != "main" {
-		return Err(format!("CRRP only supports main branch. Current branch: {branch}").into());
+	let allow_non_main = common.allow_non_main || repo_config.allow_non_main;
+	if branch != "main" && !allow_non_main {
+		return Err(format!(
+			"CRRP only supports main branch. Current branch: {branch}. Use --allow-non-main or set allowNonMain=true in .crrp/config.json for testing."
+		)
+		.into());
 	}
 
 	let repo_id = resolve_repo_id(common.repo_id.as_deref(), &repo_root)?;
+	let wallet_backend = resolve_wallet_backend(common.wallet_backend, &repo_config)?;
+	let wallet_project_id = common
+		.wallet_project_id
+		.clone()
+		.or_else(|| repo_config.wallet_project_id.clone());
+	let wallet_chain = common
+		.wallet_chain
+		.clone()
+		.or_else(|| repo_config.wallet_chain.clone())
+		.unwrap_or_else(|| DEFAULT_WALLET_CHAIN.to_string());
+	let eth_rpc_url = eth_rpc_url_override
+		.map(str::to_string)
+		.or_else(|| repo_config.eth_rpc_http.clone())
+		.unwrap_or_else(|| DEFAULT_ETH_RPC_HTTP.to_string());
 
 	if common.mock {
 		let state = load_mock_state(&repo_root)?;
 		let repo_state = state.repos.get(&repo_key(repo_id)).cloned().unwrap_or_default();
-		let registry = match common.registry.as_deref() {
+		let registry = match common.registry.as_deref().or(repo_config.registry.as_deref()) {
 			Some(addr) => addr.parse()?,
 			None => Address::ZERO,
 		};
@@ -476,13 +512,17 @@ async fn preflight(
 			},
 			proposal_count: repo_state.proposal_count.to_string(),
 			release_count: repo_state.release_count.to_string(),
-			wallet_backend: common.wallet_backend,
-			wallet_project_id: common.wallet_project_id.clone(),
-			wallet_chain: common.wallet_chain.clone(),
+			wallet_backend,
+			wallet_project_id,
+			wallet_chain,
 		});
 	}
 
-	let registry = resolve_registry_address(common.registry.as_deref(), &repo_root)?;
+	let registry = resolve_registry_address(
+		common.registry.as_deref(),
+		repo_config.registry.as_deref(),
+		&repo_root,
+	)?;
 
 	let provider = ProviderBuilder::new().connect_http(eth_rpc_url.parse()?);
 	let contract = CRRPRepositoryRegistry::new(registry, &provider);
@@ -500,10 +540,33 @@ async fn preflight(
 		head_cid: repo_data.headCid,
 		proposal_count: repo_data.proposalCount.to_string(),
 		release_count: repo_data.releaseCount.to_string(),
-		wallet_backend: common.wallet_backend,
-		wallet_project_id: common.wallet_project_id.clone(),
-		wallet_chain: common.wallet_chain.clone(),
+		wallet_backend,
+		wallet_project_id,
+		wallet_chain,
 	})
+}
+
+fn resolve_wallet_backend(
+	override_backend: Option<WalletBackend>,
+	repo_config: &RepoConfig,
+) -> Result<WalletBackend, Box<dyn std::error::Error>> {
+	if let Some(backend) = override_backend {
+		return Ok(backend);
+	}
+
+	if let Some(value) = repo_config.wallet_backend.as_deref() {
+		return parse_wallet_backend(value);
+	}
+
+	Ok(WalletBackend::Pwallet)
+}
+
+fn parse_wallet_backend(value: &str) -> Result<WalletBackend, Box<dyn std::error::Error>> {
+	match value.trim().to_lowercase().as_str() {
+		"mock" => Ok(WalletBackend::Mock),
+		"pwallet" => Ok(WalletBackend::Pwallet),
+		other => Err(format!("Invalid wallet_backend in .crrp/config.json: {other}").into()),
+	}
 }
 
 fn repo_key(repo_id: FixedBytes<32>) -> String {
@@ -766,8 +829,9 @@ fn resolve_repo_id(
 		return Ok(repo_id.parse()?);
 	}
 
-	let config_path = repo_root.join(".crrp").join("repo-id");
-	if !config_path.exists() {
+	let config_path = crate::commands::config::repo_id_path(repo_root);
+	let value = read_repo_id_if_exists(repo_root)?;
+	if value.is_none() {
 		return Err(format!(
 			"Missing repo ID config. Expected {} or pass --repo-id <0x...>",
 			config_path.display()
@@ -775,21 +839,22 @@ fn resolve_repo_id(
 		.into());
 	}
 
-	let raw = fs::read_to_string(&config_path)?;
-	let value = raw.trim();
-	if value.is_empty() {
-		return Err(format!("Repo ID file is empty: {}", config_path.display()).into());
-	}
-
-	Ok(value.parse()?)
+	Ok(value.expect("checked above").parse()?)
 }
 
 fn resolve_registry_address(
 	registry_override: Option<&str>,
+	config_registry: Option<&str>,
 	repo_root: &Path,
 ) -> Result<Address, Box<dyn std::error::Error>> {
 	if let Some(addr) = registry_override {
 		return Ok(addr.parse()?);
+	}
+
+	if let Some(addr) = config_registry {
+		if !addr.trim().is_empty() {
+			return Ok(addr.parse()?);
+		}
 	}
 
 	if let Ok(addr) = std::env::var("CRRP_REGISTRY_ADDRESS") {
@@ -903,15 +968,20 @@ mod tests {
 		Ok(())
 	}
 
+	fn checkout_branch(repo_root: &Path, branch: &str) -> Result<(), Box<dyn std::error::Error>> {
+		run_git(repo_root, &["checkout", "-b", branch])
+	}
+
 	fn mock_common(repo: &Path) -> CrrpCommonArgs {
 		CrrpCommonArgs {
 			repo: Some(repo.to_path_buf()),
 			repo_id: None,
 			registry: None,
 			mock: true,
-			wallet_backend: WalletBackend::Mock,
+			allow_non_main: false,
+			wallet_backend: Some(WalletBackend::Mock),
 			wallet_project_id: None,
-			wallet_chain: "polkadot:91b171bb158e2d3848fa23a9f1c25182".to_string(),
+			wallet_chain: Some("polkadot:91b171bb158e2d3848fa23a9f1c25182".to_string()),
 		}
 	}
 
@@ -923,7 +993,7 @@ mod tests {
 	async fn preflight_uses_mock_backend_without_rpc() -> Result<(), Box<dyn std::error::Error>> {
 		let repo = TempRepo::new()?;
 
-		let ctx = preflight(&mock_common(&repo.path), "http://127.0.0.1:1").await?;
+		let ctx = preflight(&mock_common(&repo.path), Some("http://127.0.0.1:1")).await?;
 		assert!(matches!(ctx.backend, Backend::Mock));
 		assert_eq!(ctx.registry, Address::ZERO);
 		assert_eq!(ctx.proposal_count, "0");
@@ -934,23 +1004,56 @@ mod tests {
 	}
 
 	#[tokio::test]
+	async fn preflight_rejects_non_main_by_default() -> Result<(), Box<dyn std::error::Error>> {
+		let repo = TempRepo::new()?;
+		checkout_branch(&repo.path, "feature/test")?;
+
+		let result = preflight(&mock_common(&repo.path), Some("http://127.0.0.1:1")).await;
+		assert!(result.is_err(), "preflight should reject non-main branch by default");
+		let error = result.err().ok_or("expected preflight error on non-main")?;
+		assert!(error.to_string().contains("only supports main branch"));
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn preflight_allows_non_main_when_opted_in() -> Result<(), Box<dyn std::error::Error>> {
+		let repo = TempRepo::new()?;
+		checkout_branch(&repo.path, "feature/test")?;
+
+		let mut common = mock_common(&repo.path);
+		common.allow_non_main = true;
+		let ctx = preflight(&common, Some("http://127.0.0.1:1")).await?;
+		assert!(matches!(ctx.backend, Backend::Mock));
+
+		common.allow_non_main = false;
+		let config = RepoConfig { allow_non_main: true, ..RepoConfig::default() };
+		crate::commands::config::save_repo_config(&repo.path, &config)?;
+		let from_config = preflight(&common, Some("http://127.0.0.1:1")).await?;
+		assert!(matches!(from_config.backend, Backend::Mock));
+		Ok(())
+	}
+
+	#[tokio::test]
 	async fn mock_lifecycle_updates_local_state() -> Result<(), Box<dyn std::error::Error>> {
 		let repo = TempRepo::new()?;
 		let common = mock_common(&repo.path);
 		let repo_id = test_repo_id();
 
-		run_propose(ProposeArgs { common: common.clone(), dry_run: false }, "http://127.0.0.1:1")
-			.await?;
+		run_propose(
+			ProposeArgs { common: common.clone(), dry_run: false },
+			Some("http://127.0.0.1:1"),
+		)
+		.await?;
 
 		run_merge(
 			MergeArgs { common: common.clone(), proposal_id: 0, dry_run: false },
-			"http://127.0.0.1:1",
+			Some("http://127.0.0.1:1"),
 		)
 		.await?;
 
 		run_release(
 			ReleaseArgs { common, version: "v0.1.0".to_string(), dry_run: false },
-			"http://127.0.0.1:1",
+			Some("http://127.0.0.1:1"),
 		)
 		.await?;
 
@@ -969,7 +1072,7 @@ mod tests {
 		let repo = TempRepo::new()?;
 		let error = run_merge(
 			MergeArgs { common: mock_common(&repo.path), proposal_id: 0, dry_run: false },
-			"http://127.0.0.1:1",
+			Some("http://127.0.0.1:1"),
 		)
 		.await
 		.expect_err("merge should fail when proposal is missing");
@@ -984,8 +1087,11 @@ mod tests {
 		let repo = TempRepo::new()?;
 		let common = mock_common(&repo.path);
 
-		run_propose(ProposeArgs { common: common.clone(), dry_run: false }, "http://127.0.0.1:1")
-			.await?;
+		run_propose(
+			ProposeArgs { common: common.clone(), dry_run: false },
+			Some("http://127.0.0.1:1"),
+		)
+		.await?;
 		let first = load_wallet_session(&repo.path)?.expect("wallet session should exist");
 
 		run_review(
@@ -994,10 +1100,10 @@ mod tests {
 				proposal_id: 0,
 				decision: ReviewDecision::Approve,
 			},
-			"http://127.0.0.1:1",
+			Some("http://127.0.0.1:1"),
 		)
 		.await?;
-		run_merge(MergeArgs { common, proposal_id: 0, dry_run: false }, "http://127.0.0.1:1")
+		run_merge(MergeArgs { common, proposal_id: 0, dry_run: false }, Some("http://127.0.0.1:1"))
 			.await?;
 
 		let second = load_wallet_session(&repo.path)?.expect("wallet session should still exist");
@@ -1010,7 +1116,7 @@ mod tests {
 		let repo = TempRepo::new()?;
 		run_propose(
 			ProposeArgs { common: mock_common(&repo.path), dry_run: true },
-			"http://127.0.0.1:1",
+			Some("http://127.0.0.1:1"),
 		)
 		.await?;
 		assert!(load_wallet_session(&repo.path)?.is_none());
@@ -1021,10 +1127,10 @@ mod tests {
 	async fn pwallet_backend_requires_project_id() -> Result<(), Box<dyn std::error::Error>> {
 		let repo = TempRepo::new()?;
 		let mut common = mock_common(&repo.path);
-		common.wallet_backend = WalletBackend::Pwallet;
+		common.wallet_backend = Some(WalletBackend::Pwallet);
 		common.wallet_project_id = None;
 
-		let error = run_propose(ProposeArgs { common, dry_run: false }, "http://127.0.0.1:1")
+		let error = run_propose(ProposeArgs { common, dry_run: false }, Some("http://127.0.0.1:1"))
 			.await
 			.expect_err("pwallet flow should require project id");
 		assert!(error.to_string().contains("CRRP_WALLETCONNECT_PROJECT_ID"));
