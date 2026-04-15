@@ -1,11 +1,15 @@
 [package]
 name = "stack-cli"
-description = "CLI tool for interacting with the Polkadot Stack Template chain via subxt and alloy."
+description = "Rust CLI for CRRP proposal/review/merge/release workflows."
 version = "0.1.0"
 license.workspace = true
 authors.workspace = true
 edition.workspace = true
 publish = false
+
+[[bin]]
+name = "crrp"
+path = "src/main.rs"
 
 [dependencies]
 codec = { workspace = true, features = ["std"] }
