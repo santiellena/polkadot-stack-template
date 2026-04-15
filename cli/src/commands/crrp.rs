@@ -4,8 +4,9 @@ use alloy::{
 	sol,
 };
 use clap::{Args, ValueEnum};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
+	collections::BTreeMap,
 	fs,
 	path::{Path, PathBuf},
 	process::Command,
@@ -57,6 +58,9 @@ pub struct CrrpCommonArgs {
 	/// Optional registry contract address override.
 	#[arg(long)]
 	pub registry: Option<String>,
+	/// Use local mock backend instead of eth-rpc contract reads/writes.
+	#[arg(long, env = "CRRP_MOCK", default_value_t = false)]
+	pub mock: bool,
 }
 
 #[derive(Args)]
@@ -154,7 +158,30 @@ struct Deployments {
 	evm: Option<String>,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum Backend {
+	Rpc,
+	Mock,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct MockState {
+	#[serde(default)]
+	repos: BTreeMap<String, MockRepoState>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+struct MockRepoState {
+	#[serde(default)]
+	proposal_count: u64,
+	#[serde(default)]
+	release_count: u64,
+	#[serde(default)]
+	head_cid: String,
+}
+
 struct CrrpContext {
+	backend: Backend,
 	repo_root: PathBuf,
 	repo_id: FixedBytes<32>,
 	registry: Address,
@@ -206,6 +233,13 @@ async fn run_propose(
 	println!("4. Submit proposal transaction");
 	if args.dry_run {
 		println!("Dry-run enabled: no upload/signature/transaction executed.");
+	} else if ctx.backend == Backend::Mock {
+		let mut state = load_mock_state(&ctx.repo_root)?;
+		let repo_state = mock_repo_state_mut(&mut state, ctx.repo_id);
+		let proposal_id = repo_state.proposal_count;
+		repo_state.proposal_count += 1;
+		save_mock_state(&ctx.repo_root, &state)?;
+		println!("Mock backend: stored local proposal #{proposal_id}.");
 	}
 
 	Ok(())
@@ -231,6 +265,9 @@ async fn run_review(args: ReviewArgs, eth_rpc_url: &str) -> Result<(), Box<dyn s
 	println!("Repo ID: {:#x}", ctx.repo_id);
 	println!("Decision: {:?}", args.decision);
 	println!("Skeleton: request wallet signature -> submit on-chain review.");
+	if ctx.backend == Backend::Mock {
+		println!("Mock backend: review accepted locally (no transaction submitted).");
+	}
 	Ok(())
 }
 
@@ -250,6 +287,20 @@ async fn run_merge(args: MergeArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std
 	println!("5. Submit merge transaction (update canonical HEAD)");
 	if args.dry_run {
 		println!("Dry-run enabled: no upload/signature/transaction executed.");
+	} else if ctx.backend == Backend::Mock {
+		let mut state = load_mock_state(&ctx.repo_root)?;
+		let repo_state = mock_repo_state_mut(&mut state, ctx.repo_id);
+		if args.proposal_id >= repo_state.proposal_count {
+			return Err(format!(
+				"Mock backend: proposal {} not found for this repo.",
+				args.proposal_id
+			)
+			.into());
+		}
+
+		repo_state.head_cid = format!("mock://merge/{}", args.proposal_id);
+		save_mock_state(&ctx.repo_root, &state)?;
+		println!("Mock backend: proposal {} marked merged locally.", args.proposal_id);
 	}
 
 	Ok(())
@@ -266,6 +317,13 @@ async fn run_release(
 	println!("Skeleton: read canonical HEAD -> request wallet signature -> submit release.");
 	if args.dry_run {
 		println!("Dry-run enabled: no signature/transaction executed.");
+	} else if ctx.backend == Backend::Mock {
+		let mut state = load_mock_state(&ctx.repo_root)?;
+		let repo_state = mock_repo_state_mut(&mut state, ctx.repo_id);
+		let release_id = repo_state.release_count;
+		repo_state.release_count += 1;
+		save_mock_state(&ctx.repo_root, &state)?;
+		println!("Mock backend: release {} recorded locally as #{}.", args.version, release_id);
 	}
 
 	Ok(())
@@ -277,6 +335,7 @@ async fn run_status(args: StatusArgs, eth_rpc_url: &str) -> Result<(), Box<dyn s
 	let local_head = git_output(&ctx.repo_root, &["rev-parse", "HEAD"])?;
 
 	println!("CRRP Status (skeleton)");
+	println!("Backend: {}", if ctx.backend == Backend::Mock { "mock" } else { "rpc" });
 	println!("Repository: {}", ctx.repo_root.display());
 	println!("Repo ID: {:#x}", ctx.repo_id);
 	println!("Registry: {}", ctx.registry);
@@ -293,6 +352,7 @@ async fn run_status(args: StatusArgs, eth_rpc_url: &str) -> Result<(), Box<dyn s
 async fn run_repo(args: RepoArgs, eth_rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url).await?;
 	println!("CRRP Repo (skeleton)");
+	println!("Backend: {}", if ctx.backend == Backend::Mock { "mock" } else { "rpc" });
 	println!("Repository: {}", ctx.repo_root.display());
 	println!("Repo ID: {:#x}", ctx.repo_id);
 	println!("Registry: {}", ctx.registry);
@@ -311,6 +371,7 @@ async fn run_proposals(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url).await?;
 	println!("CRRP Proposals (skeleton)");
+	println!("Backend: {}", if ctx.backend == Backend::Mock { "mock" } else { "rpc" });
 	println!("Repository: {}", ctx.repo_root.display());
 	println!("Repo ID: {:#x}", ctx.repo_id);
 	println!("Registry: {}", ctx.registry);
@@ -335,6 +396,32 @@ async fn preflight(
 	}
 
 	let repo_id = resolve_repo_id(common.repo_id.as_deref(), &repo_root)?;
+
+	if common.mock {
+		let state = load_mock_state(&repo_root)?;
+		let repo_state = state.repos.get(&repo_key(repo_id)).cloned().unwrap_or_default();
+		let registry = match common.registry.as_deref() {
+			Some(addr) => addr.parse()?,
+			None => Address::ZERO,
+		};
+
+		return Ok(CrrpContext {
+			backend: Backend::Mock,
+			repo_root,
+			repo_id,
+			registry,
+			maintainer: Address::ZERO,
+			head_commit: FixedBytes::ZERO,
+			head_cid: if repo_state.head_cid.is_empty() {
+				"mock://head".to_string()
+			} else {
+				repo_state.head_cid
+			},
+			proposal_count: repo_state.proposal_count.to_string(),
+			release_count: repo_state.release_count.to_string(),
+		});
+	}
+
 	let registry = resolve_registry_address(common.registry.as_deref(), &repo_root)?;
 
 	let provider = ProviderBuilder::new().connect_http(eth_rpc_url.parse()?);
@@ -344,6 +431,7 @@ async fn preflight(
 	})?;
 
 	Ok(CrrpContext {
+		backend: Backend::Rpc,
 		repo_root,
 		repo_id,
 		registry,
@@ -353,6 +441,36 @@ async fn preflight(
 		proposal_count: repo_data.proposalCount.to_string(),
 		release_count: repo_data.releaseCount.to_string(),
 	})
+}
+
+fn repo_key(repo_id: FixedBytes<32>) -> String {
+	format!("{:#x}", repo_id)
+}
+
+fn mock_state_path(repo_root: &Path) -> PathBuf {
+	repo_root.join(".crrp").join("mock-state.json")
+}
+
+fn load_mock_state(repo_root: &Path) -> Result<MockState, Box<dyn std::error::Error>> {
+	let path = mock_state_path(repo_root);
+	if !path.exists() {
+		return Ok(MockState::default());
+	}
+
+	let raw = fs::read_to_string(path)?;
+	Ok(serde_json::from_str(&raw)?)
+}
+
+fn save_mock_state(repo_root: &Path, state: &MockState) -> Result<(), Box<dyn std::error::Error>> {
+	let dir = repo_root.join(".crrp");
+	fs::create_dir_all(&dir)?;
+	let path = mock_state_path(repo_root);
+	fs::write(path, serde_json::to_string_pretty(state)? + "\n")?;
+	Ok(())
+}
+
+fn mock_repo_state_mut(state: &mut MockState, repo_id: FixedBytes<32>) -> &mut MockRepoState {
+	state.repos.entry(repo_key(repo_id)).or_default()
 }
 
 fn resolve_repo_id(
