@@ -83,9 +83,9 @@ cargo run -p stack-cli -- config init \
   --registry 0x0000000000000000000000000000000000000001 \
   --eth-rpc-http http://127.0.0.1:8545 \
   --substrate-rpc-ws ws://127.0.0.1:9944 \
-  --wallet-backend pwallet \
-  --wallet-project-id <project_id> \
-  --wallet-chain polkadot:91b171bb158e2d3848fa23a9f1c25182 \
+  --wallet-backend papp \
+  --papp-term-metadata https://example.com/metadata.json \
+  --papp-term-endpoint wss://pop3-testnet.parity-lab.parity.io/people \
   --allow-non-main true
 
 # Inspect current config
@@ -96,9 +96,9 @@ CRRP command resolution order:
 
 - Repo ID: `--repo-id` -> `.crrp/repo-id`
 - Registry: `--registry` -> `.crrp/config.json` -> `CRRP_REGISTRY_ADDRESS` -> `deployments.json`
-- Wallet backend: `--wallet-backend` -> `.crrp/config.json` -> default `pwallet`
-- Wallet project id: `--wallet-project-id` -> `.crrp/config.json`
-- Wallet chain: `--wallet-chain` -> `.crrp/config.json` -> default Polkadot CAIP-2
+- Wallet backend: `--wallet-backend` -> `.crrp/config.json` -> default `papp`
+- papp-term metadata: `--papp-term-metadata` -> `.crrp/config.json`
+- papp-term endpoint: `--papp-term-endpoint` -> `.crrp/config.json`
 - ETH RPC URL: `--eth-rpc-url` -> `.crrp/config.json` (`ethRpcHttp`) -> `http://127.0.0.1:8545`
 
 ## Shared CRRP Flags
@@ -116,16 +116,15 @@ All CRRP commands (`propose`, `fetch`, `review`, `merge`, `release`, `status`, `
 - `--mock`
   - Use local mock backend instead of contract RPC reads/writes.
   - Env: `CRRP_MOCK`
-- `--wallet-backend <mock|pwallet>`
+- `--wallet-backend <mock|papp>`
   - Wallet sign-in backend for signature-requiring commands.
-  - Default: `pwallet`
-- `--wallet-project-id <ID>`
-  - WalletConnect project id for `pwallet`.
-  - Env: `CRRP_WALLETCONNECT_PROJECT_ID`
-- `--wallet-chain <CAIP2>`
-  - WalletConnect CAIP-2 chain id.
-  - Env: `CRRP_WALLETCONNECT_CHAIN`
-  - Default: `polkadot:91b171bb158e2d3848fa23a9f1c25182`
+  - Default: `papp`
+- `--papp-term-metadata <URL>`
+  - Metadata URL passed to `papp-term tui`.
+  - Env: `CRRP_PAPP_TERM_METADATA`
+- `--papp-term-endpoint <WSS_URL>`
+  - Statement-store endpoint passed to `papp-term tui`.
+  - Env: `CRRP_PAPP_TERM_ENDPOINT`
 - `--allow-non-main`
   - Allow CRRP execution outside `main` branch for testing.
   - Env: `CRRP_ALLOW_NON_MAIN`
@@ -242,7 +241,6 @@ Signature-requiring commands call a shared wallet-session hook:
 Session files:
 
 - `.crrp/wallet-session.json` (CLI session summary)
-- `.crrp/pwallet-session.json` (WalletConnect bridge session file)
 
 ### `mock` wallet backend
 
@@ -252,25 +250,14 @@ No external wallet required. CLI prints a mock QR and persists a mock session.
 cargo run -p stack-cli -- propose --repo /path/to/repo --mock --wallet-backend mock
 ```
 
-### `pwallet` backend (WalletConnect bridge)
+### `papp` backend (`papp-terminal`)
 
-Install sidecar dependencies once:
-
-```bash
-cd cli/wallet-bridge
-npm install
-```
-
-Set project id:
-
-```bash
-export CRRP_WALLETCONNECT_PROJECT_ID=<your_project_id>
-```
+CRRP links to `papp-terminal` as a Rust library and opens the TUI in-process for wallet sign-in.
 
 Run command:
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo --wallet-backend pwallet
+cargo run -p stack-cli -- propose --repo /path/to/repo --wallet-backend papp
 ```
 
-If bridge deps are missing, CLI prints the exact install command automatically.
+CRRP launches `papp-term tui` for sign-in when a signature-requiring command runs.

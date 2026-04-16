@@ -7,8 +7,6 @@ use std::{
 	process::Command,
 };
 
-const DEFAULT_WALLET_CHAIN: &str = "polkadot:91b171bb158e2d3848fa23a9f1c25182";
-
 #[derive(Subcommand)]
 pub enum ConfigAction {
 	/// Initialize or update repository CRRP config (interactive or flag-driven)
@@ -20,7 +18,8 @@ pub enum ConfigAction {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum ConfigWalletBackend {
 	Mock,
-	Pwallet,
+	#[value(alias = "pwallet")]
+	Papp,
 }
 
 #[derive(Args)]
@@ -46,12 +45,12 @@ pub struct ConfigInitArgs {
 	/// Default wallet backend.
 	#[arg(long, value_enum)]
 	pub wallet_backend: Option<ConfigWalletBackend>,
-	/// Default WalletConnect project id.
+	/// Default papp-term metadata URL.
 	#[arg(long)]
-	pub wallet_project_id: Option<String>,
-	/// Default WalletConnect CAIP-2 chain id.
+	pub papp_term_metadata: Option<String>,
+	/// Default statement-store endpoint passed to papp-term.
 	#[arg(long)]
-	pub wallet_chain: Option<String>,
+	pub papp_term_endpoint: Option<String>,
 	/// Allow running CRRP commands outside main (testing only).
 	#[arg(long)]
 	pub allow_non_main: Option<bool>,
@@ -76,9 +75,9 @@ pub struct RepoConfig {
 	#[serde(default)]
 	pub wallet_backend: Option<String>,
 	#[serde(default)]
-	pub wallet_project_id: Option<String>,
+	pub papp_term_metadata: Option<String>,
 	#[serde(default)]
-	pub wallet_chain: Option<String>,
+	pub papp_term_endpoint: Option<String>,
 	#[serde(default)]
 	pub allow_non_main: bool,
 }
@@ -159,11 +158,11 @@ fn run_init(args: ConfigInitArgs) -> Result<(), Box<dyn std::error::Error>> {
 	if let Some(value) = args.wallet_backend {
 		config.wallet_backend = Some(value_to_wallet_backend(value).to_string());
 	}
-	if let Some(value) = normalize_optional(args.wallet_project_id) {
-		config.wallet_project_id = Some(value);
+	if let Some(value) = normalize_optional(args.papp_term_metadata) {
+		config.papp_term_metadata = Some(value);
 	}
-	if let Some(value) = normalize_optional(args.wallet_chain) {
-		config.wallet_chain = Some(value);
+	if let Some(value) = normalize_optional(args.papp_term_endpoint) {
+		config.papp_term_endpoint = Some(value);
 	}
 	if let Some(value) = args.allow_non_main {
 		config.allow_non_main = value;
@@ -180,22 +179,20 @@ fn run_init(args: ConfigInitArgs) -> Result<(), Box<dyn std::error::Error>> {
 		config.eth_rpc_http =
 			prompt_optional("Default Ethereum RPC URL", config.eth_rpc_http.as_deref())?;
 
-		let wallet_backend_default = config.wallet_backend.as_deref().unwrap_or("pwallet");
+		let wallet_backend_default = config.wallet_backend.as_deref().unwrap_or("papp");
 		let wallet_backend =
-			prompt_string("Default wallet backend [mock|pwallet]", Some(wallet_backend_default))?;
+			prompt_string("Default wallet backend [mock|papp]", Some(wallet_backend_default))?;
 		let normalized_backend = normalize_optional(Some(wallet_backend)).unwrap_or_default();
 		if !normalized_backend.is_empty() {
 			config.wallet_backend = Some(normalized_backend);
 		}
 
-		config.wallet_project_id = prompt_optional(
-			"Default WalletConnect project id",
-			config.wallet_project_id.as_deref(),
+		config.papp_term_metadata = prompt_optional(
+			"Default papp-term metadata URL",
+			config.papp_term_metadata.as_deref(),
 		)?;
-		config.wallet_chain = prompt_optional(
-			"Default WalletConnect chain (CAIP-2)",
-			config.wallet_chain.as_deref().or(Some(DEFAULT_WALLET_CHAIN)),
-		)?;
+		config.papp_term_endpoint =
+			prompt_optional("Default papp-term endpoint", config.papp_term_endpoint.as_deref())?;
 
 		config.allow_non_main =
 			prompt_bool("Allow non-main branch for CRRP commands", config.allow_non_main)?;
@@ -313,7 +310,7 @@ fn prompt_bool(label: &str, current: bool) -> Result<bool, Box<dyn std::error::E
 fn value_to_wallet_backend(value: ConfigWalletBackend) -> &'static str {
 	match value {
 		ConfigWalletBackend::Mock => "mock",
-		ConfigWalletBackend::Pwallet => "pwallet",
+		ConfigWalletBackend::Papp => "papp",
 	}
 }
 
@@ -356,8 +353,8 @@ mod tests {
 			eth_rpc_http: Some("http://127.0.0.1:8545".to_string()),
 			registry: Some("0x0000000000000000000000000000000000000001".to_string()),
 			wallet_backend: Some("mock".to_string()),
-			wallet_project_id: Some("pid".to_string()),
-			wallet_chain: Some("polkadot:91b171bb158e2d3848fa23a9f1c25182".to_string()),
+			papp_term_metadata: Some("https://example.com/metadata.json".to_string()),
+			papp_term_endpoint: Some("wss://example.com/people".to_string()),
 			allow_non_main: true,
 		};
 
@@ -368,8 +365,8 @@ mod tests {
 		assert_eq!(actual.eth_rpc_http, expected.eth_rpc_http);
 		assert_eq!(actual.registry, expected.registry);
 		assert_eq!(actual.wallet_backend, expected.wallet_backend);
-		assert_eq!(actual.wallet_project_id, expected.wallet_project_id);
-		assert_eq!(actual.wallet_chain, expected.wallet_chain);
+		assert_eq!(actual.papp_term_metadata, expected.papp_term_metadata);
+		assert_eq!(actual.papp_term_endpoint, expected.papp_term_endpoint);
 		assert_eq!(actual.allow_non_main, expected.allow_non_main);
 
 		Ok(())

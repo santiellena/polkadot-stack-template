@@ -15,7 +15,6 @@ use std::{
 	time::{SystemTime, UNIX_EPOCH},
 };
 
-const DEFAULT_WALLET_CHAIN: &str = "polkadot:91b171bb158e2d3848fa23a9f1c25182";
 const DEFAULT_ETH_RPC_HTTP: &str = "http://127.0.0.1:8545";
 
 sol! {
@@ -73,12 +72,12 @@ pub struct CrrpCommonArgs {
 	/// Wallet backend for signature-requiring CRRP commands.
 	#[arg(long, value_enum)]
 	pub wallet_backend: Option<WalletBackend>,
-	/// WalletConnect cloud project id (required for pwallet backend).
-	#[arg(long, env = "CRRP_WALLETCONNECT_PROJECT_ID")]
-	pub wallet_project_id: Option<String>,
-	/// CAIP-2 chain id for WalletConnect session namespace.
-	#[arg(long, env = "CRRP_WALLETCONNECT_CHAIN")]
-	pub wallet_chain: Option<String>,
+	/// Optional metadata URL passed to papp-term auth handshake.
+	#[arg(long, env = "CRRP_PAPP_TERM_METADATA")]
+	pub papp_term_metadata: Option<String>,
+	/// Optional statement-store endpoint passed to papp-term.
+	#[arg(long, env = "CRRP_PAPP_TERM_ENDPOINT")]
+	pub papp_term_endpoint: Option<String>,
 }
 
 #[derive(Args)]
@@ -185,7 +184,8 @@ enum Backend {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum WalletBackend {
 	Mock,
-	Pwallet,
+	#[value(alias = "pwallet")]
+	Papp,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -215,8 +215,8 @@ struct CrrpContext {
 	proposal_count: String,
 	release_count: String,
 	wallet_backend: WalletBackend,
-	wallet_project_id: Option<String>,
-	wallet_chain: String,
+	papp_term_metadata: Option<String>,
+	papp_term_endpoint: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -227,17 +227,6 @@ struct WalletSession {
 	wallet_label: String,
 	#[serde(default)]
 	chain: Option<String>,
-	#[serde(default)]
-	accounts: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct PwalletBridgeEnsureSession {
-	status: String,
-	topic: String,
-	wallet_label: String,
-	created_at_unix_secs: u64,
-	chain: String,
 	#[serde(default)]
 	accounts: Vec<String>,
 }
@@ -266,7 +255,7 @@ async fn run_propose(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
-		ensure_wallet_session(&ctx, "proposal submission")?;
+		ensure_wallet_session(&ctx, "proposal submission").await?;
 	}
 	let head = git_output(&ctx.repo_root, &["rev-parse", "HEAD"])?;
 	let base =
@@ -318,7 +307,7 @@ async fn run_review(
 	eth_rpc_url_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
-	ensure_wallet_session(&ctx, "review submission")?;
+	ensure_wallet_session(&ctx, "review submission").await?;
 	println!("Reviewing proposal {}...", args.proposal_id);
 	println!("Repository: {}", ctx.repo_root.display());
 	println!("Repo ID: {:#x}", ctx.repo_id);
@@ -336,7 +325,7 @@ async fn run_merge(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
-		ensure_wallet_session(&ctx, "proposal merge")?;
+		ensure_wallet_session(&ctx, "proposal merge").await?;
 	}
 	let head = git_output(&ctx.repo_root, &["rev-parse", "HEAD"])?;
 
@@ -377,7 +366,7 @@ async fn run_release(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let ctx = preflight(&args.common, eth_rpc_url_override).await?;
 	if !args.dry_run {
-		ensure_wallet_session(&ctx, "release creation")?;
+		ensure_wallet_session(&ctx, "release creation").await?;
 	}
 	println!("Creating release {}...", args.version);
 	println!("Repository: {}", ctx.repo_root.display());
@@ -476,15 +465,14 @@ async fn preflight(
 
 	let repo_id = resolve_repo_id(common.repo_id.as_deref(), &repo_root)?;
 	let wallet_backend = resolve_wallet_backend(common.wallet_backend, &repo_config)?;
-	let wallet_project_id = common
-		.wallet_project_id
+	let papp_term_metadata = common
+		.papp_term_metadata
 		.clone()
-		.or_else(|| repo_config.wallet_project_id.clone());
-	let wallet_chain = common
-		.wallet_chain
+		.or_else(|| repo_config.papp_term_metadata.clone());
+	let papp_term_endpoint = common
+		.papp_term_endpoint
 		.clone()
-		.or_else(|| repo_config.wallet_chain.clone())
-		.unwrap_or_else(|| DEFAULT_WALLET_CHAIN.to_string());
+		.or_else(|| repo_config.papp_term_endpoint.clone());
 	let eth_rpc_url = eth_rpc_url_override
 		.map(str::to_string)
 		.or_else(|| repo_config.eth_rpc_http.clone())
@@ -513,8 +501,8 @@ async fn preflight(
 			proposal_count: repo_state.proposal_count.to_string(),
 			release_count: repo_state.release_count.to_string(),
 			wallet_backend,
-			wallet_project_id,
-			wallet_chain,
+			papp_term_metadata,
+			papp_term_endpoint,
 		});
 	}
 
@@ -541,8 +529,8 @@ async fn preflight(
 		proposal_count: repo_data.proposalCount.to_string(),
 		release_count: repo_data.releaseCount.to_string(),
 		wallet_backend,
-		wallet_project_id,
-		wallet_chain,
+		papp_term_metadata,
+		papp_term_endpoint,
 	})
 }
 
@@ -558,13 +546,13 @@ fn resolve_wallet_backend(
 		return parse_wallet_backend(value);
 	}
 
-	Ok(WalletBackend::Pwallet)
+	Ok(WalletBackend::Papp)
 }
 
 fn parse_wallet_backend(value: &str) -> Result<WalletBackend, Box<dyn std::error::Error>> {
 	match value.trim().to_lowercase().as_str() {
 		"mock" => Ok(WalletBackend::Mock),
-		"pwallet" => Ok(WalletBackend::Pwallet),
+		"papp" | "pwallet" => Ok(WalletBackend::Papp),
 		other => Err(format!("Invalid wallet_backend in .crrp/config.json: {other}").into()),
 	}
 }
@@ -579,10 +567,6 @@ fn mock_state_path(repo_root: &Path) -> PathBuf {
 
 fn wallet_session_path(repo_root: &Path) -> PathBuf {
 	repo_root.join(".crrp").join("wallet-session.json")
-}
-
-fn pwallet_session_path(repo_root: &Path) -> PathBuf {
-	repo_root.join(".crrp").join("pwallet-session.json")
 }
 
 fn load_mock_state(repo_root: &Path) -> Result<MockState, Box<dyn std::error::Error>> {
@@ -625,13 +609,13 @@ fn save_wallet_session(
 	Ok(())
 }
 
-fn ensure_wallet_session(
+async fn ensure_wallet_session(
 	ctx: &CrrpContext,
 	action_label: &str,
 ) -> Result<WalletSession, Box<dyn std::error::Error>> {
 	match ctx.wallet_backend {
 		WalletBackend::Mock => ensure_mock_wallet_session(&ctx.repo_root, action_label),
-		WalletBackend::Pwallet => ensure_pwallet_session(ctx, action_label),
+		WalletBackend::Papp => ensure_papp_session(ctx, action_label).await,
 	}
 }
 
@@ -658,100 +642,46 @@ fn ensure_mock_wallet_session(
 	Ok(session)
 }
 
-fn ensure_pwallet_session(
+async fn ensure_papp_session(
 	ctx: &CrrpContext,
 	action_label: &str,
 ) -> Result<WalletSession, Box<dyn std::error::Error>> {
-	let project_id = ctx
-		.wallet_project_id
+	if let Some(session) = load_wallet_session(&ctx.repo_root)? {
+		println!(
+			"Wallet session active ({} via {}). Continuing with {}.",
+			session.session_id, session.wallet_label, action_label
+		);
+		return Ok(session);
+	}
+
+	let metadata = ctx
+		.papp_term_metadata
 		.as_deref()
-		.filter(|value| !value.trim().is_empty())
-		.ok_or(
-			"pwallet backend requires --wallet-project-id or CRRP_WALLETCONNECT_PROJECT_ID env var",
-		)?;
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+		.unwrap_or(papp_term::DEFAULT_METADATA);
 
-	let bridge_script = pwallet_bridge_script_path()?;
-	ensure_pwallet_bridge_dependencies(&bridge_script)?;
-	let session_file = pwallet_session_path(&ctx.repo_root);
-	let output = Command::new("node")
-		.arg(&bridge_script)
-		.arg("ensure-session")
-		.arg("--session-file")
-		.arg(&session_file)
-		.arg("--project-id")
-		.arg(project_id)
-		.arg("--chain")
-		.arg(&ctx.wallet_chain)
-		.arg("--action")
-		.arg(action_label)
-		.output()
-		.map_err(|error| format!("Failed to run pwallet bridge: {error}"))?;
+	let endpoint_values: Vec<String> = ctx
+		.papp_term_endpoint
+		.as_deref()
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
+		.map(|value| vec![value.to_string()])
+		.unwrap_or_default();
+	let endpoints = papp_term::resolve_endpoints(&endpoint_values);
 
-	if !output.status.success() {
-		let stderr = String::from_utf8_lossy(&output.stderr);
-		let stdout = String::from_utf8_lossy(&output.stdout);
-		return Err(format!("pwallet bridge failed: {} {}", stderr.trim(), stdout.trim()).into());
-	}
+	println!("Wallet sign-in required for {}.", action_label);
+	println!("Launching papp-terminal TUI...");
+	papp_term::tui::run_tui(metadata, &endpoints).await.map_err(|error| {
+		format!(
+			"papp-terminal library flow failed while requesting wallet sign-in for {action_label}: {error}"
+		)
+	})?;
 
-	let stdout = String::from_utf8(output.stdout)?;
-	let bridge_result: PwalletBridgeEnsureSession =
-		serde_json::from_str(stdout.trim()).map_err(|error| {
-			format!("pwallet bridge returned invalid json: {error}. Output: {}", stdout.trim())
-		})?;
-
-	let session = WalletSession {
-		backend: "pwallet".to_string(),
-		session_id: bridge_result.topic,
-		created_at_unix_secs: bridge_result.created_at_unix_secs,
-		wallet_label: bridge_result.wallet_label,
-		chain: Some(bridge_result.chain),
-		accounts: bridge_result.accounts,
-	};
+	let session = create_papp_wallet_session(&ctx.repo_root, ctx.papp_term_endpoint.as_deref())?;
 	save_wallet_session(&ctx.repo_root, &session)?;
-	println!(
-		"Wallet session active ({} via {}). Continuing with {}.",
-		session.session_id, session.wallet_label, action_label
-	);
-	if !session.accounts.is_empty() {
-		println!("Wallet accounts in session: {}", session.accounts.join(", "));
-	}
-	if bridge_result.status == "connected" {
-		println!("New pwallet session established through WalletConnect.");
-	}
+	println!("Wallet connected via papp-terminal (session {}).", session.session_id);
 	Ok(session)
-}
-
-fn pwallet_bridge_script_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-	let script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-		.join("wallet-bridge")
-		.join("pwallet-bridge.mjs");
-	if !script_path.exists() {
-		return Err(format!("pwallet bridge script not found: {}", script_path.display()).into());
-	}
-	Ok(script_path)
-}
-
-fn ensure_pwallet_bridge_dependencies(
-	bridge_script: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-	let bridge_dir = bridge_script
-		.parent()
-		.ok_or_else(|| "Invalid pwallet bridge path".to_string())?;
-	let dependency_probe = bridge_dir
-		.join("node_modules")
-		.join("@walletconnect")
-		.join("sign-client")
-		.join("package.json");
-
-	if dependency_probe.exists() {
-		return Ok(());
-	}
-
-	Err(format!(
-		"pwallet bridge dependencies are missing. Run: cd {} && npm install",
-		bridge_dir.display()
-	)
-	.into())
 }
 
 fn create_mock_wallet_session(
@@ -768,7 +698,7 @@ fn create_mock_wallet_session(
 		backend: "mock".to_string(),
 		session_id,
 		created_at_unix_secs: now,
-		wallet_label: "pwallet-mock".to_string(),
+		wallet_label: "mock-wallet".to_string(),
 		chain: None,
 		accounts: Vec::new(),
 	})
@@ -776,6 +706,30 @@ fn create_mock_wallet_session(
 
 fn session_uri(session: &WalletSession) -> String {
 	format!("crrp://wallet-connect?session={}&wallet={}", session.session_id, session.wallet_label)
+}
+
+fn create_papp_wallet_session(
+	repo_root: &Path,
+	endpoint: Option<&str>,
+) -> Result<WalletSession, Box<dyn std::error::Error>> {
+	let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+	let mut hasher = Blake2b512::new();
+	hasher.update(repo_root.display().to_string().as_bytes());
+	hasher.update(now.to_le_bytes());
+	if let Some(endpoint) = endpoint {
+		hasher.update(endpoint.trim().as_bytes());
+	}
+	let digest = hasher.finalize();
+	let session_id = hex::encode(&digest[..8]);
+
+	Ok(WalletSession {
+		backend: "papp".to_string(),
+		session_id,
+		created_at_unix_secs: now,
+		wallet_label: "papp-terminal".to_string(),
+		chain: endpoint.map(|value| value.to_string()),
+		accounts: Vec::new(),
+	})
 }
 
 fn print_mock_qr(payload: &str) {
@@ -980,8 +934,8 @@ mod tests {
 			mock: true,
 			allow_non_main: false,
 			wallet_backend: Some(WalletBackend::Mock),
-			wallet_project_id: None,
-			wallet_chain: Some("polkadot:91b171bb158e2d3848fa23a9f1c25182".to_string()),
+			papp_term_metadata: None,
+			papp_term_endpoint: None,
 		}
 	}
 
@@ -1120,20 +1074,6 @@ mod tests {
 		)
 		.await?;
 		assert!(load_wallet_session(&repo.path)?.is_none());
-		Ok(())
-	}
-
-	#[tokio::test]
-	async fn pwallet_backend_requires_project_id() -> Result<(), Box<dyn std::error::Error>> {
-		let repo = TempRepo::new()?;
-		let mut common = mock_common(&repo.path);
-		common.wallet_backend = Some(WalletBackend::Pwallet);
-		common.wallet_project_id = None;
-
-		let error = run_propose(ProposeArgs { common, dry_run: false }, Some("http://127.0.0.1:1"))
-			.await
-			.expect_err("pwallet flow should require project id");
-		assert!(error.to_string().contains("CRRP_WALLETCONNECT_PROJECT_ID"));
 		Ok(())
 	}
 }
