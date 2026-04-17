@@ -15,7 +15,7 @@ The current command surface is CRRP-focused:
 - `proposals`
 - `chain` (`info`, `blocks`, `statement-submit`, `statement-dump`)
 
-Important: CRRP commands are still marked as `skeleton` in output. The workflow and hooks are wired, but full transaction execution is still being implemented.
+Important: most CRRP commands are still `skeleton` flows. `propose` in `--mock` mode now creates a real git bundle, derives a mock CID, and records a local proposal submission.
 
 ## Run
 
@@ -131,7 +131,7 @@ All CRRP commands (`propose`, `fetch`, `review`, `merge`, `release`, `status`, `
 
 Extra per-command flags:
 
-- `propose --dry-run`
+- `propose --commit <REV> --dry-run`
 - `merge --dry-run`
 - `release --dry-run`
 - `fetch --into <DIR>`
@@ -148,6 +148,19 @@ Prepare/submit a proposal flow.
 cargo run -p stack-cli -- propose --repo /path/to/repo
 ```
 
+Use a specific commit instead of `HEAD`:
+
+```bash
+cargo run -p stack-cli -- propose --repo /path/to/repo --commit HEAD~1
+```
+
+In `--mock` mode this now:
+
+- creates a git bundle for the selected commit
+- stores the bundle under `.crrp/bulletins/`
+- derives a mock CID
+- records the proposal in `.crrp/mock-state.json`
+
 ### `fetch <proposal_id>`
 
 Fetch proposal artifact flow.
@@ -155,6 +168,8 @@ Fetch proposal artifact flow.
 ```bash
 cargo run -p stack-cli -- fetch 7 --repo /path/to/repo --into /tmp/proposal-7
 ```
+
+In `--mock` mode, `fetch` copies the saved bundle from the local bulletin store into the target directory (or into the exact `.bundle` file path you pass).
 
 ### `review <proposal_id> --decision <approve|reject>`
 
