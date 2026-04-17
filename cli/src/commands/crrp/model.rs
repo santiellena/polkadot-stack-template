@@ -53,6 +53,7 @@ pub(super) struct CrrpContext {
 	pub backend: Backend,
 	pub repo_root: PathBuf,
 	pub repo_id: FixedBytes<32>,
+	pub substrate_rpc_ws: String,
 	pub registry: Address,
 	pub maintainer: Address,
 	pub head_commit: FixedBytes<32>,

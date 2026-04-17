@@ -1,5 +1,7 @@
 use std::{fs, path::PathBuf};
 
+use crate::commands::{resolve_substrate_signer, upload_to_bulletin};
+
 use super::{
 	args::{
 		CrrpAction, FetchArgs, MergeArgs, ProposalsArgs, ProposeArgs, ReleaseArgs, RepoArgs,
@@ -84,8 +86,25 @@ pub(super) async fn run_propose(
 		println!("Mock CID: {}", bundle_submission.cid);
 		println!("Wallet session: {}", wallet_session.session_id);
 	} else {
-		println!("Bundle preparation completed locally.");
-		println!("Real Bulletin Chain / Asset Hub submission is not implemented yet.");
+		let bundle_submission = create_mock_bundle_submission(&ctx.repo_root, &proposal)?;
+		let wallet_session = ensure_wallet_session(&ctx, "proposal submission").await?;
+		let signer_input = args.common.bulletin_signer.as_deref().ok_or(
+			"Missing --bulletin-signer for non-mock propose. Provide a dev account, mnemonic phrase, or 0x secret seed for Bulletin upload.",
+		)?;
+		let signer = resolve_substrate_signer(signer_input)?;
+		let bundle_bytes = fs::read(&bundle_submission.bundle_path)?;
+		let extrinsic_hash =
+			upload_to_bulletin(&bundle_bytes, &ctx.substrate_rpc_ws, &signer).await?;
+
+		println!("Bulletin upload submitted.");
+		println!("Bulletin RPC: {}", ctx.substrate_rpc_ws);
+		println!("Bulletin extrinsic hash: {extrinsic_hash}");
+		println!("Local bundle path: {}", bundle_submission.bundle_path.display());
+		println!("Local CID placeholder: {}", bundle_submission.cid);
+		println!("Wallet session: {}", wallet_session.session_id);
+		println!(
+			"Contract submission step still pending: use proposal commit + Bulletin-backed artifact reference."
+		);
 	}
 
 	Ok(())

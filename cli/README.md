@@ -125,6 +125,10 @@ All CRRP commands (`propose`, `fetch`, `review`, `merge`, `release`, `status`, `
 - `--papp-term-endpoint <WSS_URL>`
   - Statement-store endpoint passed to `papp-term tui`.
   - Env: `CRRP_PAPP_TERM_ENDPOINT`
+- `--bulletin-signer <SIGNER>`
+  - Substrate signer for Bulletin upload in non-mock `propose` (required there).
+  - Supports dev account name (`alice`), mnemonic phrase, or `0x` 32-byte secret seed.
+  - Env: `CRRP_BULLETIN_SIGNER`
 - `--allow-non-main`
   - Allow CRRP execution outside `main` branch for testing.
   - Env: `CRRP_ALLOW_NON_MAIN`
@@ -145,13 +149,13 @@ Extra per-command flags:
 Prepare/submit a proposal flow.
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo
+cargo run -p stack-cli -- propose --repo /path/to/repo --bulletin-signer "<mnemonic-or-0x-seed>"
 ```
 
 Use a specific commit instead of `HEAD`:
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo --commit HEAD~1
+cargo run -p stack-cli -- propose --repo /path/to/repo --commit HEAD~1 --bulletin-signer "<mnemonic-or-0x-seed>"
 ```
 
 In `--mock` mode this now:
@@ -160,6 +164,14 @@ In `--mock` mode this now:
 - stores the bundle under `.crrp/bulletins/`
 - derives a mock CID
 - records the proposal in `.crrp/mock-state.json`
+
+In non-mock mode, `propose` now also:
+
+- requires `--bulletin-signer` / `CRRP_BULLETIN_SIGNER`
+- checks `TransactionStorage.Authorizations` first and fails early if authorization is missing/insufficient
+- uploads the bundle bytes with a Bulletin extrinsic (`TransactionStorage.store`)
+- prints finalized extrinsic hash
+- keeps using a local CID placeholder until chain-derived CID wiring is completed
 
 ### `fetch <proposal_id>`
 

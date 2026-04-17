@@ -19,6 +19,7 @@ use super::{
 };
 
 const DEFAULT_ETH_RPC_HTTP: &str = "http://127.0.0.1:8545";
+const DEFAULT_SUBSTRATE_RPC_WS: &str = "ws://127.0.0.1:9944";
 
 sol! {
 	#[sol(rpc)]
@@ -69,6 +70,10 @@ pub(super) async fn preflight(
 		.map(str::to_string)
 		.or_else(|| repo_config.eth_rpc_http.clone())
 		.unwrap_or_else(|| DEFAULT_ETH_RPC_HTTP.to_string());
+	let substrate_rpc_ws = repo_config
+		.substrate_rpc_ws
+		.clone()
+		.unwrap_or_else(|| DEFAULT_SUBSTRATE_RPC_WS.to_string());
 
 	if common.mock {
 		let state = load_mock_state(&repo_root)?;
@@ -82,6 +87,7 @@ pub(super) async fn preflight(
 			backend: Backend::Mock,
 			repo_root,
 			repo_id,
+			substrate_rpc_ws,
 			registry,
 			maintainer: Address::ZERO,
 			head_commit: FixedBytes::ZERO,
@@ -114,6 +120,7 @@ pub(super) async fn preflight(
 		backend: Backend::Rpc,
 		repo_root,
 		repo_id,
+		substrate_rpc_ws,
 		registry,
 		maintainer: repo_data.maintainer,
 		head_commit: repo_data.headCommit,

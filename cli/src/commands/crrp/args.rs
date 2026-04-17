@@ -46,6 +46,10 @@ pub struct CrrpCommonArgs {
 	/// Optional statement-store endpoint passed to papp-term.
 	#[arg(long, env = "CRRP_PAPP_TERM_ENDPOINT")]
 	pub papp_term_endpoint: Option<String>,
+	/// Substrate signer used for Bulletin extrinsic upload.
+	/// Supports dev accounts, mnemonic phrase, or 0x secret seed.
+	#[arg(long, env = "CRRP_BULLETIN_SIGNER")]
+	pub bulletin_signer: Option<String>,
 }
 
 #[derive(Args)]
