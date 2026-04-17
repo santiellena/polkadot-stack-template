@@ -96,11 +96,9 @@ fn write_git_bundle(
 
 	let mut command = Command::new("git");
 	command.arg("bundle").arg("create").arg(destination);
-	if let Some(base_commit) = proposal.base_commit.as_deref() {
-		command.arg(&temp_ref).arg(format!("^{base_commit}"));
-	} else {
-		command.arg(&temp_ref);
-	}
+	// MVP invariant: proposal bundles must be self-contained snapshots.
+	// Always include the full reachable history for the selected ref.
+	command.arg(&temp_ref);
 	let output = command.current_dir(repo_root).output()?;
 	let _ = Command::new("git")
 		.arg("update-ref")

@@ -110,6 +110,7 @@ fn mock_common(repo: &Path) -> CrrpCommonArgs {
 		wallet_backend: Some(WalletBackend::Mock),
 		papp_term_metadata: None,
 		papp_term_endpoint: None,
+		bulletin_signer: None,
 	}
 }
 
@@ -338,6 +339,46 @@ async fn propose_uses_explicit_commit_override() -> Result<(), Box<dyn std::erro
 
 	let proposal = proposal_for_repo(&repo.path, test_repo_id(), 0)?;
 	assert_eq!(proposal.commit, first_commit);
+
+	Ok(())
+}
+
+#[tokio::test]
+async fn mock_propose_bundle_is_importable_in_fresh_repo() -> Result<(), Box<dyn std::error::Error>>
+{
+	let repo = TempRepo::new()?;
+	let base_commit = commit_file(&repo.path, "base.txt", "base\n", "base commit")?;
+	commit_file(&repo.path, "src.txt", "proposal\n", "proposal commit")?;
+
+	run_propose(
+		ProposeArgs { common: mock_common(&repo.path), commit: None, dry_run: false },
+		Some("http://127.0.0.1:1"),
+	)
+	.await?;
+
+	let proposal = proposal_for_repo(&repo.path, test_repo_id(), 0)?;
+	assert_eq!(proposal.base_commit.as_deref(), Some(base_commit.as_str()));
+	let bundle_path = repo.path.join(&proposal.bundle_path);
+
+	let import_repo = TempRepo::new()?;
+	run_git(&import_repo.path, &["checkout", "--detach"])?;
+
+	let fetch_output = Command::new("git")
+		.arg("fetch")
+		.arg(&bundle_path)
+		.arg(format!("{}:refs/crrp/imported", proposal.commit))
+		.current_dir(&import_repo.path)
+		.output()?;
+	if !fetch_output.status.success() {
+		return Err(format!(
+			"git fetch from bundle failed: {}",
+			String::from_utf8_lossy(&fetch_output.stderr)
+		)
+		.into());
+	}
+
+	let imported = git_output(&import_repo.path, &["rev-parse", "refs/crrp/imported"])?;
+	assert_eq!(imported, proposal.commit);
 
 	Ok(())
 }
