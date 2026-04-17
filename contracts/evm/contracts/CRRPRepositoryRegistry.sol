@@ -14,6 +14,8 @@ interface ICRRPIncentivesTreasury {
 }
 
 contract CRRPRepositoryRegistry {
+	/// @dev Proposal IDs are scoped per-repo and allocated from `Repo.proposalCount`.
+	///      The first proposal for a repo is ID 0, then 1, 2, ...
 	enum ProposalStatus {
 		None,
 		Open,
@@ -23,8 +25,10 @@ contract CRRPRepositoryRegistry {
 
 	struct Repo {
 		address maintainer;
+		/// @dev Canonical HEAD commit identifier recorded on-chain.
 		bytes32 headCommit;
 		string headCid;
+		/// @dev Next proposal ID to assign for this repo (also total proposals created).
 		uint256 proposalCount;
 		uint256 releaseCount;
 		address incentiveTreasury;
@@ -33,11 +37,13 @@ contract CRRPRepositoryRegistry {
 
 	struct Proposal {
 		address contributor;
+		/// @dev Proposed commit identifier (32-byte canonicalized value chosen off-chain).
 		bytes32 proposedCommit;
 		string proposedCid;
 		uint256 approvals;
 		uint256 rejections;
 		ProposalStatus status;
+		/// @dev Final accepted commit identifier written at merge time.
 		bytes32 mergedCommit;
 		string mergedCid;
 	}
@@ -49,16 +55,21 @@ contract CRRPRepositoryRegistry {
 
 	struct Release {
 		string version;
+		/// @dev Canonical commit identifier associated with this release tag.
 		bytes32 commitHash;
 		string cid;
 		bool exists;
 	}
 
 	mapping(bytes32 => Repo) private repos;
+	/// @dev proposals[repoId][proposalId]
 	mapping(bytes32 => mapping(uint256 => Proposal)) private proposals;
+	/// @dev reviews[repoId][proposalId][reviewer]
 	mapping(bytes32 => mapping(uint256 => mapping(address => Review))) private reviews;
+	/// @dev Approved reviewers to reward when the proposal is merged.
 	mapping(bytes32 => mapping(uint256 => address[])) private approvedReviewers;
 	mapping(bytes32 => mapping(bytes32 => Release)) private releases;
+	/// @dev canonicalCommits[repoId][commitHash] == true once accepted as canonical.
 	mapping(bytes32 => mapping(bytes32 => bool)) private canonicalCommits;
 	mapping(bytes32 => mapping(address => bool)) private contributorRoles;
 	mapping(bytes32 => mapping(address => bool)) private reviewerRoles;
@@ -176,6 +187,7 @@ contract CRRPRepositoryRegistry {
 		require(proposedCommit != bytes32(0), "Commit required");
 		require(bytes(proposedCid).length != 0, "CID required");
 
+		// Monotonic per-repo ID allocation (0-based).
 		proposalId = repo.proposalCount;
 		repo.proposalCount += 1;
 
