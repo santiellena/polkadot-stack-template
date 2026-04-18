@@ -1,6 +1,8 @@
 use std::fs;
 
-use crate::commands::{resolve_substrate_signer, upload_to_bulletin};
+use crate::commands::{
+	ensure_bulletin_upload_capability, resolve_substrate_signer, upload_to_bulletin,
+};
 
 use super::{
 	super::{
@@ -80,6 +82,7 @@ pub(crate) async fn run_propose(
 		"Missing --bulletin-signer for non-mock propose. Provide a dev account, mnemonic phrase, or 0x secret seed for Bulletin upload.",
 	)?;
 	let signer = resolve_substrate_signer(signer_input)?;
+	ensure_bulletin_upload_capability(&ctx.substrate_rpc_ws).await?;
 	let bundle_submission = create_mock_bundle_submission(&ctx.repo_root, &proposal)?;
 	let bundle_bytes = fs::read(&bundle_submission.bundle_path).map_err(|error| {
 		format!(

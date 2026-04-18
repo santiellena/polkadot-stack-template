@@ -13,6 +13,9 @@ use subxt_signer::sr25519::{dev, Keypair};
 // Matches the node-side statement store propagation limit.
 const MAX_STATEMENT_STORE_ENCODED_SIZE: usize = 1024 * 1024 - 1;
 const BULLETIN_MAX_UPLOAD_BYTES: usize = 8 * 1024 * 1024;
+const BULLETIN_PALLET: &str = "TransactionStorage";
+const BULLETIN_STORE_CALL: &str = "store";
+const BULLETIN_AUTHORIZATIONS_STORAGE: &str = "Authorizations";
 
 /// Resolve an sr25519 signer for the statement store from a flexible input.
 pub fn resolve_statement_signer(
@@ -85,10 +88,11 @@ pub async fn upload_to_bulletin(
 	}
 
 	let api = OnlineClient::<PolkadotConfig>::from_url(ws_url).await?;
+	ensure_bulletin_upload_capability_from_api(&api)?;
 	ensure_bulletin_upload_authorization(&api, signer, file_bytes.len()).await?;
 	let tx = subxt::dynamic::tx(
-		"TransactionStorage",
-		"store",
+		BULLETIN_PALLET,
+		BULLETIN_STORE_CALL,
 		vec![("data", subxt::dynamic::Value::from_bytes(file_bytes))],
 	);
 	let result = api
@@ -99,6 +103,55 @@ pub async fn upload_to_bulletin(
 		.await?;
 
 	Ok(format!("{}", result.extrinsic_hash()))
+}
+
+/// Validate that the target runtime supports Bulletin uploads used by CRRP propose.
+pub async fn ensure_bulletin_upload_capability(
+	ws_url: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let api = OnlineClient::<PolkadotConfig>::from_url(ws_url).await?;
+	ensure_bulletin_upload_capability_from_api(&api)
+}
+
+fn ensure_bulletin_upload_capability_from_api(
+	api: &OnlineClient<PolkadotConfig>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let metadata = api.metadata();
+	let Some(pallet) = metadata.pallet_by_name(BULLETIN_PALLET) else {
+		return Err(format!(
+			"Runtime metadata does not expose {BULLETIN_PALLET}. Bulletin upload is unavailable on this chain. Use --mock for propose or switch to a chain with Bulletin support."
+		)
+		.into());
+	};
+
+	let has_store_call = pallet.call_variant_by_name(BULLETIN_STORE_CALL).is_some();
+	let has_authorizations_storage = pallet
+		.storage()
+		.and_then(|storage| storage.entry_by_name(BULLETIN_AUTHORIZATIONS_STORAGE))
+		.is_some();
+
+	validate_bulletin_capability_flags(has_store_call, has_authorizations_storage)
+}
+
+fn validate_bulletin_capability_flags(
+	has_store_call: bool,
+	has_authorizations_storage: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+	if !has_store_call {
+		return Err(format!(
+			"{BULLETIN_PALLET}.{BULLETIN_STORE_CALL} call is missing in runtime metadata. Bulletin upload is unavailable on this chain."
+		)
+		.into());
+	}
+
+	if !has_authorizations_storage {
+		return Err(format!(
+			"{BULLETIN_PALLET}.{BULLETIN_AUTHORIZATIONS_STORAGE} storage is missing in runtime metadata. Bulletin authorization checks cannot run on this chain."
+		)
+		.into());
+	}
+
+	Ok(())
 }
 
 async fn ensure_bulletin_upload_authorization(
@@ -150,7 +203,8 @@ async fn fetch_bulletin_authorization_with_key(
 	api: &OnlineClient<PolkadotConfig>,
 	key: subxt::dynamic::Value<()>,
 ) -> Result<Option<(u128, u128)>, Box<dyn std::error::Error>> {
-	let storage_query = subxt::dynamic::storage("TransactionStorage", "Authorizations", vec![key]);
+	let storage_query =
+		subxt::dynamic::storage(BULLETIN_PALLET, BULLETIN_AUTHORIZATIONS_STORAGE, vec![key]);
 	let maybe_auth = api.storage().at_latest().await?.fetch(&storage_query).await?;
 	let Some(auth_value) = maybe_auth else {
 		return Ok(None);
@@ -283,7 +337,7 @@ impl std::fmt::Display for RpcError {
 
 #[cfg(test)]
 mod tests {
-	use super::decode_bulletin_authorization_extent;
+	use super::{decode_bulletin_authorization_extent, validate_bulletin_capability_flags};
 	use subxt::dynamic::Value;
 
 	#[test]
@@ -314,5 +368,24 @@ mod tests {
 		let auth = Value::named_composite([("extent", Value::u128(1))]);
 		let decoded = decode_bulletin_authorization_extent(&auth);
 		assert_eq!(decoded, None);
+	}
+
+	#[test]
+	fn validates_bulletin_capability_flags_when_complete() {
+		assert!(validate_bulletin_capability_flags(true, true).is_ok());
+	}
+
+	#[test]
+	fn fails_bulletin_capability_flags_without_store_call() {
+		let error = validate_bulletin_capability_flags(false, true)
+			.expect_err("missing store call should fail bulletin capability check");
+		assert!(error.to_string().contains("TransactionStorage.store"));
+	}
+
+	#[test]
+	fn fails_bulletin_capability_flags_without_authorizations_storage() {
+		let error = validate_bulletin_capability_flags(true, false)
+			.expect_err("missing authorizations storage should fail bulletin capability check");
+		assert!(error.to_string().contains("TransactionStorage.Authorizations"));
 	}
 }
