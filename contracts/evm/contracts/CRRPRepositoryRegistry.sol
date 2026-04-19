@@ -24,6 +24,8 @@ contract CRRPRepositoryRegistry {
 	}
 
 	struct Repo {
+		string organization;
+		string name;
 		address maintainer;
 		/// @dev Canonical HEAD commit identifier recorded on-chain.
 		bytes32 headCommit;
@@ -78,6 +80,8 @@ contract CRRPRepositoryRegistry {
 		bytes32 indexed repoId,
 		address indexed maintainer,
 		bytes32 indexed headCommit,
+		string organization,
+		string name,
 		string headCid
 	);
 	event ProposalSubmitted(
@@ -115,16 +119,23 @@ contract CRRPRepositoryRegistry {
 	event IncentiveTreasuryUpdated(bytes32 indexed repoId, address indexed treasury);
 
 	function createRepo(
-		bytes32 repoId,
+		string calldata organization,
+		string calldata name,
 		bytes32 initialHeadCommit,
 		string calldata initialHeadCid
-	) external {
-		require(repoId != bytes32(0), "Repo id required");
-		require(!repos[repoId].exists, "Repo already exists");
+	) external returns (bytes32 repoId) {
+		require(bytes(organization).length != 0, "Organization required");
+		require(bytes(name).length != 0, "Repository name required");
 		require(initialHeadCommit != bytes32(0), "Head commit required");
 		require(bytes(initialHeadCid).length != 0, "Head CID required");
 
+		repoId = deriveRepoId(organization, name);
+		require(repoId != bytes32(0), "Repo id required");
+		require(!repos[repoId].exists, "Repo already exists");
+
 		Repo storage repo = repos[repoId];
+		repo.organization = organization;
+		repo.name = name;
 		repo.maintainer = msg.sender;
 		repo.headCommit = initialHeadCommit;
 		repo.headCid = initialHeadCid;
@@ -132,7 +143,14 @@ contract CRRPRepositoryRegistry {
 
 		canonicalCommits[repoId][initialHeadCommit] = true;
 
-		emit RepoCreated(repoId, msg.sender, initialHeadCommit, initialHeadCid);
+		emit RepoCreated(repoId, msg.sender, initialHeadCommit, organization, name, initialHeadCid);
+	}
+
+	function deriveRepoId(
+		string memory organization,
+		string memory name
+	) public pure returns (bytes32) {
+		return keccak256(bytes(string.concat(organization, "/", name)));
 	}
 
 	function transferMaintainer(bytes32 repoId, address newMaintainer) external {
@@ -317,6 +335,14 @@ contract CRRPRepositoryRegistry {
 			repo.proposalCount,
 			repo.releaseCount
 		);
+	}
+
+	function getRepoMetadata(
+		bytes32 repoId
+	) external view returns (string memory organization, string memory name) {
+		Repo storage repo = repos[repoId];
+		require(repo.exists, "Repo not found");
+		return (repo.organization, repo.name);
 	}
 
 	function getProposal(

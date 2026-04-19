@@ -7,7 +7,9 @@ const STATUS_OPEN = 1;
 const STATUS_REJECTED = 2;
 const STATUS_MERGED = 3;
 
-const repoId = keccak256(toBytes("acme/crrp"));
+const organization = "acme";
+const repository = "crrp";
+const repoId = keccak256(toBytes(`${organization}/${repository}`));
 const initialHeadCommit = keccak256(toBytes("main:0001"));
 const initialHeadCid = "cid:main:0001";
 const proposedCommit = keccak256(toBytes("main:0002"));
@@ -38,9 +40,12 @@ describe("CRRPRepositoryRegistry (EVM)", function () {
 		registry: Awaited<ReturnType<typeof deployFixture>>["registry"],
 		maintainerAddress: `0x${string}`,
 	): Promise<void> {
-		await registry.write.createRepo([repoId, initialHeadCommit, initialHeadCid], {
+		await registry.write.createRepo(
+			[organization, repository, initialHeadCommit, initialHeadCid],
+			{
 			account: maintainerAddress,
-		});
+			},
+		);
 	}
 
 	async function grantContributorRole(
@@ -69,7 +74,10 @@ describe("CRRPRepositoryRegistry (EVM)", function () {
 
 		const [storedMaintainer, headCommit, headCid, proposalCount, releaseCount] =
 			await registry.read.getRepo([repoId]);
+		const [storedOrganization, storedRepository] = await registry.read.getRepoMetadata([repoId]);
 		expect(getAddress(storedMaintainer)).to.equal(getAddress(maintainer.account.address));
+		expect(storedOrganization).to.equal(organization);
+		expect(storedRepository).to.equal(repository);
 		expect(headCommit).to.equal(initialHeadCommit);
 		expect(headCid).to.equal(initialHeadCid);
 		expect(proposalCount).to.equal(0n);
@@ -126,7 +134,7 @@ describe("CRRPRepositoryRegistry (EVM)", function () {
 		const { registry, maintainer } = await loadFixture(deployFixture);
 		await createRepo(registry, maintainer.account.address);
 		await expectRevert(
-			registry.write.createRepo([repoId, initialHeadCommit, initialHeadCid], {
+			registry.write.createRepo([organization, repository, initialHeadCommit, initialHeadCid], {
 				account: maintainer.account.address,
 			}),
 			"Repo already exists",
