@@ -44,6 +44,10 @@ pub struct CreateRepoArgs {
 	/// Skip contributor/reviewer role grants after repo creation.
 	#[arg(long, default_value_t = false)]
 	pub skip_role_grants: bool,
+	/// Test only the pwallet pairing / Statement Store / signing transport.
+	/// Skips all EVM registry reads and writes.
+	#[arg(long, default_value_t = false)]
+	pub transport_only: bool,
 }
 
 #[derive(Clone, Args)]

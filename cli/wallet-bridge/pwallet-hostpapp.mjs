@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
 import fs from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
+import { createNanoEvents } from "nanoevents";
+import { fromAsyncThrowable } from "neverthrow";
 
 const DEFAULT_TIMEOUT_MS = 300_000;
+const DEFAULT_ALLOWANCE_WAIT_MS = 30_000;
 const DEFAULT_ENDPOINT = "wss://pop3-testnet.parity-lab.parity.io/people";
 const DEFAULT_APP_ID = "crrp-cli";
 const DEFAULT_METADATA =
@@ -18,11 +22,10 @@ async function loadDependencies() {
 
   depsPromise = (async () => {
     try {
-      const [{ createPappAdapter }, statementStore, storageAdapter, wsProvider, qrModule] =
+      const [{ createPappAdapter }, statementStore, wsProvider, qrModule] =
         await Promise.all([
           import("@novasamatech/host-papp"),
           import("@novasamatech/statement-store"),
-          import("@novasamatech/storage-adapter"),
           import("polkadot-api/ws-provider"),
           import("qrcode-terminal"),
         ]);
@@ -32,7 +35,6 @@ async function loadDependencies() {
         createPappAdapter,
         createLazyClient: statementStore.createLazyClient,
         createPapiStatementStoreAdapter: statementStore.createPapiStatementStoreAdapter,
-        createMemoryAdapter: storageAdapter.createMemoryAdapter,
         getWsProvider: wsProvider.getWsProvider,
         qrcodeTerminal,
       };
@@ -122,6 +124,117 @@ function bytesToHex(bytes) {
   return `0x${Buffer.from(bytes).toString("hex")}`;
 }
 
+function storageKeyForStatementAllowance(accountIdBytes) {
+  const prefix = Buffer.from(":statement-allowance:", "utf8");
+  const keyBytes = Buffer.concat([prefix, Buffer.from(accountIdBytes)]);
+  return `0x${keyBytes.toString("hex")}`;
+}
+
+async function readJsonObjectFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, "utf8");
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function createFileStorageAdapter(storeFilePath, initialState) {
+  const events = createNanoEvents();
+  const storage = { ...initialState };
+
+  const persist = async () => {
+    const directory = path.dirname(storeFilePath);
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(storeFilePath, `${JSON.stringify(storage, null, 2)}\n`, "utf8");
+  };
+
+  return {
+    write: fromAsyncThrowable(async (key, value) => {
+      storage[key] = value;
+      await persist();
+      events.emit(key, value);
+    }),
+    read: fromAsyncThrowable(async (key) => storage[key] ?? null),
+    clear: fromAsyncThrowable(async (key) => {
+      delete storage[key];
+      await persist();
+      events.emit(key, null);
+    }),
+    subscribe(key, callback) {
+      return events.on(key, callback);
+    },
+  };
+}
+
+function resolveStorageFilePath(args, sessionOutPath) {
+  const explicit = args["storage-file"]?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  if (sessionOutPath) {
+    return path.join(path.dirname(sessionOutPath), "hostpapp-storage.json");
+  }
+
+  return ".crrp/hostpapp-storage.json";
+}
+
+async function assertStatementAllowance(
+  lazyClient,
+  localAccountIdBytes,
+  endpoint,
+  maxWaitMs = DEFAULT_ALLOWANCE_WAIT_MS,
+) {
+  const requestFn = lazyClient.getRequestFn();
+  const allowanceKey = storageKeyForStatementAllowance(localAccountIdBytes);
+  const methods = ["chain_getStorage", "state_getStorage"];
+  let lastErrors = [];
+  const start = Date.now();
+
+  // Poll briefly to reduce first-run false negatives while allowance converges.
+  while (true) {
+    const errors = [];
+    for (const method of methods) {
+      try {
+        const value = await requestFn(method, [allowanceKey]);
+        if (value !== null && value !== "0x") {
+          return;
+        }
+      } catch (error) {
+        errors.push(`${method}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    lastErrors = errors;
+
+    const elapsed = Date.now() - start;
+    if (elapsed >= maxWaitMs) {
+      break;
+    }
+
+    process.stderr.write(
+      `[hostpapp] waiting for statement allowance (${Math.round((maxWaitMs - elapsed) / 1000)}s left)\n`,
+    );
+    await sleep(3000);
+  }
+
+  const localKeyHex = bytesToHex(localAccountIdBytes);
+  const detail =
+    lastErrors.length > 0
+      ? ` RPC errors: ${lastErrors.join(" | ")}.`
+      : " Storage key was empty or missing.";
+
+  throw new Error(
+    `No statement-store allowance for host session key ${localKeyHex} on ${endpoint}. ` +
+      `Signing requests cannot be submitted, so pwallet cannot receive approval modals. ` +
+      `Provision allowance for this key (storage key ${allowanceKey}) and retry.${detail}`,
+  );
+}
+
 function parseTimeout(raw) {
   if (raw == null) {
     return DEFAULT_TIMEOUT_MS;
@@ -133,6 +246,10 @@ function parseTimeout(raw) {
   }
 
   return parsed;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function withTimeout(promise, timeoutMs, label) {
@@ -166,18 +283,14 @@ function writeQr(qrcodeTerminal, payload) {
   process.stderr.write(`Deep link: ${payload}\n`);
 }
 
-async function signRawWithHostPapp(args) {
+async function createBridgeContext(args) {
   const {
     createPappAdapter,
     createLazyClient,
     createPapiStatementStoreAdapter,
-    createMemoryAdapter,
     getWsProvider,
     qrcodeTerminal,
   } = await loadDependencies();
-
-  const payloadHex = requiredArg(args, "payload-hex");
-  const payloadBytes = hexToBytes(payloadHex);
 
   const endpoint =
     (typeof args.endpoint === "string" && args.endpoint.trim()) ||
@@ -192,9 +305,14 @@ async function signRawWithHostPapp(args) {
     process.env.CRRP_PAPP_METADATA ||
     DEFAULT_METADATA;
   const timeoutMs = parseTimeout(args["timeout-ms"]);
+  const allowanceWaitMs = parseTimeout(args["allowance-wait-ms"] ?? DEFAULT_ALLOWANCE_WAIT_MS);
+  const sessionOut = args["session-out"]?.trim();
+  const storageFile = resolveStorageFilePath(args, sessionOut);
+  const storageState = await readJsonObjectFile(storageFile);
 
   process.stderr.write(`[hostpapp] endpoint=${endpoint}\n`);
   process.stderr.write(`[hostpapp] appId=${appId}\n`);
+  process.stderr.write(`[hostpapp] storage=${storageFile}\n`);
 
   const lazyClient = createLazyClient(
     getWsProvider([endpoint], {
@@ -202,7 +320,7 @@ async function signRawWithHostPapp(args) {
     }),
   );
   const statementStore = createPapiStatementStoreAdapter(lazyClient);
-  const storage = createMemoryAdapter();
+  const storage = createFileStorageAdapter(storageFile, storageState);
   const adapter = createPappAdapter({
     appId,
     metadata,
@@ -213,6 +331,21 @@ async function signRawWithHostPapp(args) {
     },
   });
 
+  return {
+    adapter,
+    lazyClient,
+    qrcodeTerminal,
+    endpoint,
+    appId,
+    metadata,
+    timeoutMs,
+    allowanceWaitMs,
+    sessionOut,
+    storageFile,
+  };
+}
+
+async function ensureAuthenticatedSession(adapter, qrcodeTerminal, timeoutMs) {
   let qrShown = false;
   const stopPairingSubscription = adapter.sso.pairingStatus.subscribe((status) => {
     if (status.step === "pairing" && !qrShown) {
@@ -243,13 +376,19 @@ async function signRawWithHostPapp(args) {
     }
   });
 
+  let sessions = adapter.sessions.sessions.read();
+  let session = Array.isArray(sessions) && sessions.length > 0 ? sessions[0] : null;
+
+  if (session) {
+    process.stderr.write(`[hostpapp] reusing stored session ${session.id}\n`);
+    stopPairingSubscription();
+    stopAttestationSubscription();
+    return session;
+  }
+
   let authResult;
   try {
-    authResult = await withTimeout(
-      adapter.sso.authenticate(),
-      timeoutMs,
-      "host-papp authenticate",
-    );
+    authResult = await withTimeout(adapter.sso.authenticate(), timeoutMs, "host-papp authenticate");
   } finally {
     stopPairingSubscription();
     stopAttestationSubscription();
@@ -263,12 +402,118 @@ async function signRawWithHostPapp(args) {
     throw new Error("host-papp authentication was aborted before creating a session");
   }
 
-  const sessions = adapter.sessions.sessions.read();
+  sessions = adapter.sessions.sessions.read();
   if (!Array.isArray(sessions) || sessions.length === 0) {
     throw new Error("host-papp returned no active sessions after authentication");
   }
 
-  const session = sessions.find((entry) => entry.id === authResult.value.id) ?? sessions[0];
+  session = sessions.find((entry) => entry.id === authResult.value.id) ?? sessions[0];
+  if (!session) {
+    throw new Error("host-papp session is unavailable");
+  }
+
+  return session;
+}
+
+async function readSessionSecrets(adapter, session) {
+  const secretResult = await adapter.secrets.read(session.id);
+  if (secretResult.isErr()) {
+    throw new Error(`failed reading host-papp session secrets: ${secretResult.error.message}`);
+  }
+
+  if (secretResult.value == null) {
+    throw new Error("host-papp returned null secret payload for authenticated session");
+  }
+
+  return secretResult.value;
+}
+
+function buildSessionOutput(session, secrets, endpoint, appId, metadata) {
+  const address = addressFromAccountId(session.remoteAccount.accountId);
+  return {
+    endpoint,
+    app_id: appId,
+    metadata,
+    session_id: session.id,
+    address,
+    local_account_id_hex: bytesToHex(session.localAccount.accountId),
+    remote_account_id_hex: bytesToHex(session.remoteAccount.accountId),
+    remote_public_key_hex: bytesToHex(session.remoteAccount.publicKey),
+    local_secret_hex: bytesToHex(secrets.ssSecret),
+    local_entropy_hex: bytesToHex(secrets.entropy),
+    local_encr_secret_hex: bytesToHex(secrets.encrSecret),
+  };
+}
+
+async function persistSessionIfRequested(sessionOut, storageFile, output) {
+  if (!sessionOut) {
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const persistedSession = {
+    backend: "papp-hostpapp",
+    session_id: output.session_id,
+    created_at_unix_secs: now,
+    wallet_label: "pwallet",
+    chain: output.endpoint,
+    accounts: [output.address],
+    local_account_id_hex: output.local_account_id_hex,
+    remote_account_id_hex: output.remote_account_id_hex,
+    remote_public_key_hex: output.remote_public_key_hex,
+    local_secret_hex: output.local_secret_hex,
+    local_entropy_hex: output.local_entropy_hex,
+    local_encr_secret_hex: output.local_encr_secret_hex,
+    metadata_url: output.metadata,
+    app_id: output.app_id,
+    storage_file: storageFile,
+  };
+
+  await fs.mkdir(path.dirname(sessionOut), { recursive: true });
+  await fs.writeFile(sessionOut, `${JSON.stringify(persistedSession, null, 2)}\n`, "utf8");
+  process.stderr.write(`[hostpapp] wrote session export to ${sessionOut}\n`);
+}
+
+async function authWithHostPapp(args) {
+  const context = await createBridgeContext(args);
+  const session = await ensureAuthenticatedSession(
+    context.adapter,
+    context.qrcodeTerminal,
+    context.timeoutMs,
+  );
+  const secrets = await readSessionSecrets(context.adapter, session);
+
+  const output = buildSessionOutput(
+    session,
+    secrets,
+    context.endpoint,
+    context.appId,
+    context.metadata,
+  );
+  await persistSessionIfRequested(context.sessionOut, context.storageFile, output);
+  process.stdout.write(`${JSON.stringify(output)}\n`);
+  process.exit(0);
+}
+
+async function signRawWithHostPapp(args) {
+  const payloadHex = requiredArg(args, "payload-hex");
+  const payloadBytes = hexToBytes(payloadHex);
+
+  const context = await createBridgeContext(args);
+  const session = await ensureAuthenticatedSession(
+    context.adapter,
+    context.qrcodeTerminal,
+    context.timeoutMs,
+  );
+
+  await assertStatementAllowance(
+    context.lazyClient,
+    session.localAccount.accountId,
+    context.endpoint,
+    context.allowanceWaitMs,
+  );
+  process.stderr.write("[hostpapp] statement allowance present for local session key\n");
+
   const address = addressFromAccountId(session.remoteAccount.accountId);
 
   process.stderr.write(`[hostpapp] requesting signRaw from wallet for session ${session.id}\n`);
@@ -280,7 +525,7 @@ async function signRawWithHostPapp(args) {
         value: payloadBytes,
       },
     }),
-    timeoutMs,
+    context.timeoutMs,
     "host-papp signRaw",
   );
 
@@ -288,70 +533,45 @@ async function signRawWithHostPapp(args) {
     throw new Error(`wallet rejected signRaw request: ${signResult.error.message}`);
   }
 
-  const secretResult = await adapter.secrets.read(session.id);
-  if (secretResult.isErr()) {
-    throw new Error(`failed reading host-papp session secrets: ${secretResult.error.message}`);
-  }
-
-  if (secretResult.value == null) {
-    throw new Error("host-papp returned null secret payload for authenticated session");
-  }
+  const secrets = await readSessionSecrets(context.adapter, session);
+  const baseOutput = buildSessionOutput(
+    session,
+    secrets,
+    context.endpoint,
+    context.appId,
+    context.metadata,
+  );
 
   const now = Math.floor(Date.now() / 1000);
   const output = {
+    ...baseOutput,
     request_id: `${session.id}:${now}`,
-    endpoint,
-    app_id: appId,
-    metadata,
-    session_id: session.id,
-    address,
-    local_account_id_hex: bytesToHex(session.localAccount.accountId),
-    remote_account_id_hex: bytesToHex(session.remoteAccount.accountId),
-    remote_public_key_hex: bytesToHex(session.remoteAccount.publicKey),
-    local_secret_hex: bytesToHex(secretResult.value.ssSecret),
-    local_entropy_hex: bytesToHex(secretResult.value.entropy),
-    local_encr_secret_hex: bytesToHex(secretResult.value.encrSecret),
     signature_hex: bytesToHex(signResult.value.signature),
     signed_transaction_hex: signResult.value.signedTransaction
       ? bytesToHex(signResult.value.signedTransaction)
       : null,
   };
 
-  const sessionOut = args["session-out"]?.trim();
-  if (sessionOut) {
-    const persistedSession = {
-      backend: "papp-hostpapp",
-      session_id: output.session_id,
-      created_at_unix_secs: now,
-      wallet_label: "pwallet",
-      chain: output.endpoint,
-      accounts: [output.address],
-      local_account_id_hex: output.local_account_id_hex,
-      remote_account_id_hex: output.remote_account_id_hex,
-      remote_public_key_hex: output.remote_public_key_hex,
-      local_secret_hex: output.local_secret_hex,
-      local_entropy_hex: output.local_entropy_hex,
-      local_encr_secret_hex: output.local_encr_secret_hex,
-      metadata_url: output.metadata,
-      app_id: output.app_id,
-    };
-    await fs.writeFile(sessionOut, `${JSON.stringify(persistedSession, null, 2)}\n`, "utf8");
-    process.stderr.write(`[hostpapp] wrote session export to ${sessionOut}\n`);
-  }
-
+  await persistSessionIfRequested(context.sessionOut, context.storageFile, baseOutput);
   process.stdout.write(`${JSON.stringify(output)}\n`);
+  process.exit(0);
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
 
+  if (command === "auth") {
+    await authWithHostPapp(args);
+    return;
+  }
+
   if (command === "sign-raw") {
     await signRawWithHostPapp(args);
     return;
   }
 
-  throw new Error("Unsupported command. Use: sign-raw");
+  throw new Error("Unsupported command. Use: auth or sign-raw");
 }
 
 main().catch((error) => {

@@ -7,7 +7,7 @@ use std::{
 
 use super::super::model::WalletSession;
 
-fn wallet_session_path(repo_root: &Path) -> PathBuf {
+pub(crate) fn wallet_session_path(repo_root: &Path) -> PathBuf {
 	repo_root.join(".crrp").join("wallet-session.json")
 }
 
@@ -73,6 +73,12 @@ fn create_mock_wallet_session(
 		wallet_label: "mock-wallet".to_string(),
 		chain: None,
 		accounts: Vec::new(),
+		local_account_id_hex: None,
+		remote_account_id_hex: None,
+		shared_secret_hex: None,
+		local_secret_hex: None,
+		local_entropy_hex: None,
+		metadata_url: None,
 	})
 }
 

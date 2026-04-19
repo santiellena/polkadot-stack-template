@@ -85,4 +85,16 @@ pub(super) struct WalletSession {
 	pub chain: Option<String>,
 	#[serde(default)]
 	pub accounts: Vec<String>,
+	#[serde(default)]
+	pub local_account_id_hex: Option<String>,
+	#[serde(default)]
+	pub remote_account_id_hex: Option<String>,
+	#[serde(default)]
+	pub shared_secret_hex: Option<String>,
+	#[serde(default)]
+	pub local_secret_hex: Option<String>,
+	#[serde(default)]
+	pub local_entropy_hex: Option<String>,
+	#[serde(default)]
+	pub metadata_url: Option<String>,
 }

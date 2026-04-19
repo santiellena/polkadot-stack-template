@@ -90,7 +90,6 @@ pub(crate) async fn run_propose(
 			bundle_submission.bundle_path.display()
 		)
 	})?;
-	let wallet_session = ensure_wallet_session(&ctx, "proposal submission").await?;
 	let approval = request_wallet_tx_approval(
 		&ctx,
 		"Bulletin upload signature request",
@@ -109,9 +108,15 @@ pub(crate) async fn run_propose(
 	kv("Bulletin extrinsic hash", extrinsic_hash);
 	kv("Local bundle path", bundle_submission.bundle_path.display());
 	kv("Local CID placeholder", bundle_submission.cid);
-	kv("Wallet session", wallet_session.session_id);
+	if let Some(session_id) = approval.session_id.as_deref() {
+		kv("Wallet session", session_id);
+	}
 	kv("Wallet approval id", approval.approval_id);
 	kv("Wallet approval timestamp", approval.approved_at_unix_secs);
+	kv("Wallet payload digest", approval.payload_digest_hex);
+	kv("Wallet signature", approval.signature_hex);
+	kv("Wallet signature origin", approval.signature_origin.as_str());
+	kv("Wallet signature receipt", approval.receipt_path.display());
 	line("Note: extrinsic signing still uses --bulletin-signer; pwallet signing submission is pending.");
 	line("Contract submission step still pending: use proposal commit + Bulletin-backed artifact reference.");
 

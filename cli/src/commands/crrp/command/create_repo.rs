@@ -19,7 +19,7 @@ use super::{
 		preflight::{
 			resolve_eth_rpc_url, resolve_registry_address, resolve_repo_id, resolve_wallet_backend,
 		},
-		wallet::{ensure_wallet_session, request_wallet_tx_approval},
+		wallet::request_wallet_tx_approval,
 	},
 	output::{kv, line},
 	CrrpResult,
@@ -121,12 +121,57 @@ pub(crate) async fn run_create_repo(
 		}
 	}
 
-	let eth_rpc_url = resolve_eth_rpc_url(eth_rpc_url_override, &repo_config);
 	let registry = resolve_registry_address(
 		args.common.registry.as_deref(),
 		repo_config.registry.as_deref(),
 		&repo_root,
 	)?;
+	let wallet_ctx = CrrpContext {
+		backend: Backend::Rpc,
+		repo_root: repo_root.clone(),
+		repo_id,
+		substrate_rpc_ws: String::new(),
+		registry,
+		maintainer: Address::ZERO,
+		head_commit: FixedBytes::ZERO,
+		head_cid: String::new(),
+		proposal_count: "0".to_string(),
+		release_count: "0".to_string(),
+		wallet_backend,
+		papp_term_metadata,
+		papp_term_endpoint,
+	};
+	let approval = request_wallet_tx_approval(
+		&wallet_ctx,
+		"CRRP create-repo signature request",
+		&format!(
+			"repo_id={:#x}, registry={}, initial_head={}, initial_cid={}, signer={}",
+			repo_id, registry, resolved_commit, initial_head_cid, signer_address
+		),
+	)
+	.await?;
+
+	if args.transport_only {
+		line("Transport-only test completed.");
+		kv("Repository", repo_root.display());
+		kv("Repo ID", format!("{:#x}", repo_id));
+		kv("Registry", registry);
+		kv("Initial HEAD", resolved_commit);
+		kv("Initial CID", initial_head_cid);
+		if let Some(session_id) = approval.session_id.as_deref() {
+			kv("Wallet session", session_id);
+		}
+		kv("Wallet approval id", approval.approval_id);
+		kv("Wallet approval timestamp", approval.approved_at_unix_secs);
+		kv("Wallet payload digest", approval.payload_digest_hex);
+		kv("Wallet signature", approval.signature_hex);
+		kv("Wallet signature origin", approval.signature_origin.as_str());
+		kv("Wallet signature receipt", approval.receipt_path.display());
+		line("EVM registry reads/writes were skipped because --transport-only was enabled.");
+		return Ok(());
+	}
+
+	let eth_rpc_url = resolve_eth_rpc_url(eth_rpc_url_override, &repo_config);
 	let wallet = EthereumWallet::from(signer);
 	let provider = ProviderBuilder::new().wallet(wallet).connect_http(eth_rpc_url.parse()?);
 	let registry_contract = CRRPRepositoryRegistryWrite::new(registry, &provider);
@@ -148,32 +193,6 @@ pub(crate) async fn run_create_repo(
 		},
 	}
 
-	let wallet_ctx = CrrpContext {
-		backend: Backend::Rpc,
-		repo_root: repo_root.clone(),
-		repo_id,
-		substrate_rpc_ws: String::new(),
-		registry,
-		maintainer: Address::ZERO,
-		head_commit: FixedBytes::ZERO,
-		head_cid: String::new(),
-		proposal_count: "0".to_string(),
-		release_count: "0".to_string(),
-		wallet_backend,
-		papp_term_metadata,
-		papp_term_endpoint,
-	};
-	let wallet_session = ensure_wallet_session(&wallet_ctx, "repository creation").await?;
-	let approval = request_wallet_tx_approval(
-		&wallet_ctx,
-		"CRRP create-repo signature request",
-		&format!(
-			"repo_id={:#x}, registry={}, initial_head={}, initial_cid={}, signer={}",
-			repo_id, registry, resolved_commit, initial_head_cid, signer_address
-		),
-	)
-	.await?;
-
 	let create_receipt = registry_contract
 		.createRepo(repo_id, initial_head_commit, initial_head_cid.to_string())
 		.send()
@@ -189,9 +208,15 @@ pub(crate) async fn run_create_repo(
 	kv("Initial HEAD", resolved_commit);
 	kv("Initial CID", initial_head_cid);
 	kv("createRepo tx", create_receipt.transaction_hash);
-	kv("Wallet session", wallet_session.session_id);
+	if let Some(session_id) = approval.session_id.as_deref() {
+		kv("Wallet session", session_id);
+	}
 	kv("Wallet approval id", approval.approval_id);
 	kv("Wallet approval timestamp", approval.approved_at_unix_secs);
+	kv("Wallet payload digest", approval.payload_digest_hex);
+	kv("Wallet signature", approval.signature_hex);
+	kv("Wallet signature origin", approval.signature_origin.as_str());
+	kv("Wallet signature receipt", approval.receipt_path.display());
 	line("Note: createRepo tx submission still uses --signer; pwallet signing submission is pending.");
 
 	if !args.skip_role_grants {

@@ -146,6 +146,7 @@ async fn mock_create_repo_initializes_state() -> Result<(), Box<dyn std::error::
 			contributor: None,
 			reviewer: None,
 			skip_role_grants: false,
+			transport_only: false,
 		},
 		Some("http://127.0.0.1:1"),
 	)
@@ -175,6 +176,7 @@ async fn mock_create_repo_rejects_duplicate_repo() -> Result<(), Box<dyn std::er
 			contributor: None,
 			reviewer: None,
 			skip_role_grants: false,
+			transport_only: false,
 		},
 		Some("http://127.0.0.1:1"),
 	)
@@ -188,6 +190,7 @@ async fn mock_create_repo_rejects_duplicate_repo() -> Result<(), Box<dyn std::er
 			contributor: None,
 			reviewer: None,
 			skip_role_grants: false,
+			transport_only: false,
 		},
 		Some("http://127.0.0.1:1"),
 	)
@@ -214,6 +217,7 @@ async fn create_repo_fails_fast_on_repo_id_mismatch() -> Result<(), Box<dyn std:
 			contributor: None,
 			reviewer: None,
 			skip_role_grants: false,
+			transport_only: false,
 		},
 		Some("http://127.0.0.1:1"),
 	)
