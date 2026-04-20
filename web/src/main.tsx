@@ -11,6 +11,8 @@ const RepoRoute = lazy(() => import("./routes/RepoRoute"));
 const RepoHistoryRoute = lazy(() => import("./routes/RepoHistoryRoute"));
 const RepoLeaderboardRoute = lazy(() => import("./routes/RepoLeaderboardRoute"));
 const RepoTreeRoute = lazy(() => import("./routes/RepoTreeRoute"));
+const CreateProposalRoute = lazy(() => import("./routes/CreateProposalRoute"));
+const RepoProposalsRoute = lazy(() => import("./routes/RepoProposalsRoute"));
 
 const routeFallback = (
 	<div className="card animate-pulse">
@@ -77,6 +79,22 @@ createRoot(document.getElementById("root")!).render(
 						element={
 							<Suspense fallback={routeFallback}>
 								<RepoTreeRoute />
+							</Suspense>
+						}
+					/>
+					<Route
+						path="repo/:organization/:repository/proposals"
+						element={
+							<Suspense fallback={routeFallback}>
+								<RepoProposalsRoute />
+							</Suspense>
+						}
+					/>
+					<Route
+						path="repo/:organization/:repository/propose"
+						element={
+							<Suspense fallback={routeFallback}>
+								<CreateProposalRoute />
 							</Suspense>
 						}
 					/>

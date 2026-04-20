@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { LeaderboardTable } from "../features/leaderboard/LeaderboardTable";
 import { useRepoLeaderboard } from "../features/leaderboard/useLeaderboards";
+import { MaintainerPanel } from "../features/maintainer/MaintainerPanel";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
 import { TreasuryDonationCard } from "../features/treasury/TreasuryDonationCard";
 import {
@@ -15,7 +16,7 @@ import {
 export default function RepoRoute() {
 	const { organization, repository } = useParams();
 	const { account } = useWalletSession();
-	const { repo, loading, error } = useRepoOverview(organization, repository, account);
+	const { repo, loading, error, refresh } = useRepoOverview(organization, repository, account);
 	const { entries: leaderboardEntries, loading: leaderboardLoading } = useRepoLeaderboard(
 		repo?.repoId,
 		repo?.organization,
@@ -47,7 +48,18 @@ export default function RepoRoute() {
 						</p>
 						<p className="mt-1 text-text-tertiary font-mono break-all">{repo.repoId}</p>
 					</div>
-					<div className="flex gap-2">
+					<div className="flex flex-wrap gap-2">
+						<Link
+							to={`/repo/${encodeURIComponent(repo.organization)}/${encodeURIComponent(repo.repository)}/proposals`}
+							className="btn-secondary"
+						>
+							Proposals
+							{repo.proposalCount > 0n ? (
+								<span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-xs">
+									{repo.proposalCount.toString()}
+								</span>
+							) : null}
+						</Link>
 						<Link
 							to={`/repo/${encodeURIComponent(repo.organization)}/${encodeURIComponent(repo.repository)}/history`}
 							className="btn-secondary"
@@ -66,6 +78,14 @@ export default function RepoRoute() {
 						>
 							Leaderboard
 						</Link>
+						{repo.permissionlessContributions || repo.roles.isContributor ? (
+							<Link
+								to={`/repo/${encodeURIComponent(repo.organization)}/${encodeURIComponent(repo.repository)}/propose`}
+								className="btn-primary"
+							>
+								Submit Proposal
+							</Link>
+						) : null}
 					</div>
 				</div>
 				<p className="text-text-secondary max-w-3xl">
@@ -83,6 +103,7 @@ export default function RepoRoute() {
 				<ValueCard label="Treasury" value={repo.treasuryAddress || "Not configured"} mono />
 				<ValueCard label="Proposal Count" value={repo.proposalCount.toString()} />
 				<ValueCard label="Release Count" value={repo.releaseCount.toString()} />
+				<ValueCard label="Contributions" value={repo.permissionlessContributions ? "Open to everyone" : "Whitelisted only"} />
 				<ValueCard label="Treasury Balance" value={formatEthAmount(repo.treasuryBalance)} />
 				<ValueCard label="Registry" value={repo.registryAddress} mono />
 			</section>
@@ -218,6 +239,14 @@ cd crrp-${repo.repoId.slice(2, 10)}`}
 				) : null}
 			</section>
 
+			{repo.roles.isMaintainer ? (
+				<MaintainerPanel
+					repoId={repo.repoId}
+					permissionlessContributions={repo.permissionlessContributions}
+					onUpdated={refresh}
+				/>
+			) : null}
+
 			<TreasuryDonationCard
 				repoId={repo.repoId}
 				treasuryAddress={repo.treasuryAddress}
@@ -226,7 +255,7 @@ cd crrp-${repo.repoId.slice(2, 10)}`}
 				reviewReward={repo.reviewReward}
 				totalClaimable={repo.totalClaimable}
 				unfundedClaimable={repo.unfundedClaimable}
-				onDonated={() => window.location.reload()}
+				onDonated={refresh}
 			/>
 		</div>
 	);

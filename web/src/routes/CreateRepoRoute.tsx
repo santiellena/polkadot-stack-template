@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { isAddress, parseEther, type Address } from "viem";
+import { isAddress, parseEther, type Address, type Hex } from "viem";
 import { ZERO_ADDRESS } from "../config/crrp";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
@@ -58,6 +58,8 @@ export default function CreateRepoRoute() {
 	const [organization, setOrganization] = useState("");
 	const [repository, setRepository] = useState("");
 	const [initialHeadCommit, setInitialHeadCommit] = useState("");
+	const [permissionlessContributions, setPermissionlessContributions] = useState(false);
+	const [contributors, setContributors] = useState<string[]>([""]);
 	const [reviewerAddress, setReviewerAddress] = useState("");
 	const [contributionReward, setContributionReward] = useState("0");
 	const [reviewReward, setReviewReward] = useState("0");
@@ -211,11 +213,29 @@ export default function CreateRepoRoute() {
 				address: registryAddress,
 				abi: crrpRegistryAbi,
 				functionName: "createRepo",
-				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, bundleCid],
+				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, bundleCid, permissionlessContributions],
 				account: signerAccount,
 				chain: walletClient.chain,
 			});
 			await publicClient.waitForTransactionReceipt({ hash: createRepoHash });
+
+			if (!permissionlessContributions) {
+				const validContributors = contributors
+					.map((c) => c.trim())
+					.filter((c) => c && isAddress(c)) as Address[];
+				for (const contributorAddress of validContributors) {
+					setStatus(`Granting contributor role to ${contributorAddress}...`);
+					const contributorHash = await walletClient.writeContract({
+						address: registryAddress,
+						abi: crrpRegistryAbi,
+						functionName: "setContributorRole",
+						args: [repoId as Hex, contributorAddress, true],
+						account: signerAccount,
+						chain: walletClient.chain,
+					});
+					await publicClient.waitForTransactionReceipt({ hash: contributorHash });
+				}
+			}
 
 			if (reviewer) {
 				setStatus("Granting reviewer role...");
@@ -358,6 +378,68 @@ export default function CreateRepoRoute() {
 							repo.bundle HEAD`. The commit entered above must be the bundle `HEAD`.
 						</p>
 					</div>
+					<div className="space-y-3">
+						<label className="label">Contribution Mode</label>
+						<label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+							<input
+								type="checkbox"
+								checked={permissionlessContributions}
+								onChange={(event) => setPermissionlessContributions(event.target.checked)}
+								className="h-4 w-4 accent-accent-blue"
+							/>
+							<span className="text-sm text-text-primary">Allow anyone to contribute</span>
+						</label>
+						<p className="text-xs text-text-tertiary">
+							{permissionlessContributions
+								? "Any address can submit proposals without a whitelist."
+								: "Only whitelisted addresses can submit proposals."}
+						</p>
+					</div>
+
+					{!permissionlessContributions && (
+						<div className="space-y-2">
+							<div className="flex items-center justify-between">
+								<label className="label">Initial Contributors</label>
+								<button
+									type="button"
+									onClick={() => setContributors((prev) => [...prev, ""])}
+									className="btn-secondary px-3 py-1 text-xs"
+								>
+									+ Add
+								</button>
+							</div>
+							{contributors.map((addr, index) => (
+								<div key={index} className="flex gap-2">
+									<input
+										type="text"
+										value={addr}
+										onChange={(event) => {
+											const next = [...contributors];
+											next[index] = event.target.value;
+											setContributors(next);
+										}}
+										placeholder="0x..."
+										className="input-field flex-1 font-mono"
+									/>
+									<button
+										type="button"
+										onClick={() =>
+											setContributors((prev) => prev.filter((_, i) => i !== index))
+										}
+										className="btn-secondary px-3"
+									>
+										✕
+									</button>
+								</div>
+							))}
+							{contributors.length === 0 && (
+								<p className="text-xs text-text-tertiary">
+									No contributors added. Add at least one address to allow proposal submissions.
+								</p>
+							)}
+						</div>
+					)}
+
 					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
 						<div>Derived Repo ID</div>
 						<div className="mt-1 font-mono break-all text-text-primary">

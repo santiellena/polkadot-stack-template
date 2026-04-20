@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	isValidRepoSlugPart,
 	normalizeRepoSlugPart,
@@ -15,6 +15,9 @@ export function useRepoOverview(
 	const [repo, setRepo] = useState<RepoOverview | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [refreshKey, setRefreshKey] = useState(0);
+
+	const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -60,7 +63,7 @@ export function useRepoOverview(
 		return () => {
 			cancelled = true;
 		};
-	}, [account, organization, repository]);
+	}, [account, organization, repository, refreshKey]);
 
-	return { repo, loading, error };
+	return { repo, loading, error, refresh };
 }

@@ -19,9 +19,17 @@ export const crrpRegistryAbi = [
 			{ name: "name", type: "string" },
 			{ name: "initialHeadCommit", type: "bytes32" },
 			{ name: "initialHeadCid", type: "string" },
+			{ name: "permissionlessContributions", type: "bool" },
 		],
 		outputs: [{ name: "repoId", type: "bytes32" }],
 		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
+		name: "isPermissionlessContributions",
+		inputs: [{ name: "repoId", type: "bytes32" }],
+		outputs: [{ name: "", type: "bool" }],
+		stateMutability: "view",
 	},
 	{
 		type: "function",
@@ -90,6 +98,42 @@ export const crrpRegistryAbi = [
 			{ name: "account", type: "address" },
 		],
 		outputs: [{ name: "", type: "bool" }],
+		stateMutability: "view",
+	},
+	{
+		type: "function",
+		name: "submitProposal",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "proposedCommit", type: "bytes32" },
+			{ name: "proposedCid", type: "string" },
+		],
+		outputs: [{ name: "proposalId", type: "uint256" }],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
+		name: "reviewProposal",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "proposalId", type: "uint256" },
+			{ name: "approved", type: "bool" },
+		],
+		outputs: [],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
+		name: "getReview",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "proposalId", type: "uint256" },
+			{ name: "reviewer", type: "address" },
+		],
+		outputs: [
+			{ name: "exists", type: "bool" },
+			{ name: "approved", type: "bool" },
+		],
 		stateMutability: "view",
 	},
 	{
@@ -235,6 +279,7 @@ export type RepoOverview = {
 	proposalCount: bigint;
 	releaseCount: bigint;
 	roles: RepoRoleSet;
+	permissionlessContributions: boolean;
 	treasuryBalance: bigint | null;
 	contributionReward: bigint | null;
 	reviewReward: bigint | null;
@@ -775,7 +820,7 @@ export async function readRepoOverview(
 	const repoId = deriveRepoId(organization, repository);
 	const client = getPublicClient(getStoredEthRpcUrl());
 	const registryAddress = getRegistryAddress();
-	const [repo, metadata, treasuryAddressRaw, history, releases, roles] = await Promise.all([
+	const [repo, metadata, treasuryAddressRaw, history, releases, roles, permissionlessContributions] = await Promise.all([
 		client.readContract({
 			address: registryAddress,
 			abi: crrpRegistryAbi,
@@ -797,6 +842,12 @@ export async function readRepoOverview(
 		readRepoHistory(repoId),
 		readRepoReleases(repoId),
 		readRepoRoles(repoId, account),
+		client.readContract({
+			address: registryAddress,
+			abi: crrpRegistryAbi,
+			functionName: "isPermissionlessContributions",
+			args: [repoId],
+		}) as Promise<boolean>,
 	]);
 
 	const treasuryAddress =
@@ -843,6 +894,7 @@ export async function readRepoOverview(
 		proposalCount: repo[3],
 		releaseCount: repo[4],
 		roles,
+		permissionlessContributions,
 		treasuryBalance: treasuryData?.[0] ?? 0n,
 		contributionReward: treasuryData?.[1]?.[0] ?? 0n,
 		reviewReward: treasuryData?.[1]?.[1] ?? 0n,

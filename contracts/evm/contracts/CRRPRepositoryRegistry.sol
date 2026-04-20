@@ -33,6 +33,8 @@ contract CRRPRepositoryRegistry {
         uint256 releaseCount;
         address incentiveTreasury;
         bool exists;
+        /// @dev When true, any address may submit proposals without a contributor role.
+        bool permissionlessContributions;
     }
 
     struct Proposal {
@@ -107,7 +109,8 @@ contract CRRPRepositoryRegistry {
         string calldata organization,
         string calldata name,
         bytes32 initialHeadCommit,
-        string calldata initialHeadCid
+        string calldata initialHeadCid,
+        bool permissionlessContributions
     ) external returns (bytes32 repoId) {
         require(bytes(organization).length != 0, "Organization required");
         require(bytes(name).length != 0, "Repository name required");
@@ -125,6 +128,7 @@ contract CRRPRepositoryRegistry {
         repo.headCommit = initialHeadCommit;
         repo.headCid = initialHeadCid;
         repo.exists = true;
+        repo.permissionlessContributions = permissionlessContributions;
 
         canonicalCommits[repoId][initialHeadCommit] = true;
 
@@ -184,7 +188,9 @@ contract CRRPRepositoryRegistry {
     {
         Repo storage repo = repos[repoId];
         require(repo.exists, "Repo not found");
-        require(contributorRoles[repoId][msg.sender], "Contributor role required");
+        if (!repo.permissionlessContributions) {
+            require(contributorRoles[repoId][msg.sender], "Contributor role required");
+        }
         require(proposedCommit != bytes32(0), "Commit required");
         require(bytes(proposedCid).length != 0, "CID required");
 
@@ -373,5 +379,9 @@ contract CRRPRepositoryRegistry {
 
     function isCanonicalCommit(bytes32 repoId, bytes32 commitHash) external view returns (bool) {
         return canonicalCommits[repoId][commitHash];
+    }
+
+    function isPermissionlessContributions(bytes32 repoId) external view returns (bool) {
+        return repos[repoId].permissionlessContributions;
     }
 }

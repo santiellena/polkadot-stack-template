@@ -48,14 +48,13 @@ export function TreasuryDonationCard({
 		setStatus(null);
 		try {
 			const walletClient = await getWalletClientForWrite();
-			const [fromAccount] = await walletClient.getAddresses();
 			const hash = await walletClient.writeContract({
 				address: treasuryAddress,
 				abi: crrpTreasuryAbi,
 				functionName: "donate",
 				args: [repoId],
 				value: parseEther(amount),
-				account: fromAccount,
+				account: walletClient.account,
 				chain: walletClient.chain,
 			});
 
