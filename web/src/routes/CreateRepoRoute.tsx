@@ -1,0 +1,600 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { isAddress, parseEther, type Address } from "viem";
+import { ZERO_ADDRESS } from "../config/crrp";
+import { getPublicClient } from "../config/evm";
+import { getStoredEthRpcUrl } from "../config/network";
+import { useSubstrateSession } from "../features/auth/useSubstrateSession";
+import { useWalletSession } from "../features/auth/useWalletSession";
+import { checkBulletinAuthorization, uploadToBulletin } from "../hooks/useBulletin";
+import {
+	crrpRegistryAbi,
+	crrpTreasuryAbi,
+	deriveRepoId,
+	getRegistryAddress,
+	gitCommitHashToBytes32,
+	isValidRepoSlugPart,
+	normalizeRepoSlugPart,
+	shortenAddress,
+} from "../lib/crrp";
+import { hexHashToCid } from "../utils/cid";
+import { hashFileWithBytes } from "../utils/hash";
+
+type AuthorizationState = "idle" | "checking" | "authorized" | "unauthorized";
+
+function parseOptionalEthAmount(value: string, label: string) {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return 0n;
+	}
+
+	try {
+		return parseEther(trimmed);
+	} catch {
+		throw new Error(`${label} must be a valid UNIT amount`);
+	}
+}
+
+export default function CreateRepoRoute() {
+	const navigate = useNavigate();
+	const { account, sourceLabel, canUseBrowserWallet, canUseDevSigner, connectBrowserWallet, devAccountIndex, selectDevAccount, getWalletClientForWrite } =
+		useWalletSession();
+	const {
+		selectedSource: substrateSource,
+		setSelectedSource: setSubstrateSource,
+		canUseDevSigner: canUseDevSubstrateSigner,
+		devAccountIndex: substrateDevAccountIndex,
+		setDevAccountIndex: setSubstrateDevAccountIndex,
+		devAccounts: substrateDevAccounts,
+		hostStatus,
+		availableWallets,
+		browserAccounts,
+		browserSourceLabel,
+		selectedBrowserAccountIndex,
+		setSelectedBrowserAccountIndex,
+		connectBrowserWallet: connectSubstrateWallet,
+		getBulletinSigner,
+	} = useSubstrateSession();
+	const [organization, setOrganization] = useState("");
+	const [repository, setRepository] = useState("");
+	const [initialHeadCommit, setInitialHeadCommit] = useState("");
+	const [reviewerAddress, setReviewerAddress] = useState("");
+	const [contributionReward, setContributionReward] = useState("0");
+	const [reviewReward, setReviewReward] = useState("0");
+	const [initialDonation, setInitialDonation] = useState("0");
+	const [bundleName, setBundleName] = useState<string | null>(null);
+	const [bundleBytes, setBundleBytes] = useState<Uint8Array | null>(null);
+	const [bundleHash, setBundleHash] = useState<`0x${string}` | null>(null);
+	const [bundleCid, setBundleCid] = useState<string | null>(null);
+	const [authorizationState, setAuthorizationState] = useState<AuthorizationState>("idle");
+	const [authorizationMessage, setAuthorizationMessage] = useState<string | null>(null);
+	const [status, setStatus] = useState<string | null>(null);
+	const [submitting, setSubmitting] = useState(false);
+	const registryAddress = useMemo(() => {
+		try {
+			return getRegistryAddress();
+		} catch {
+			return null;
+		}
+	}, []);
+
+	const normalizedOrganization = normalizeRepoSlugPart(organization);
+	const normalizedRepository = normalizeRepoSlugPart(repository);
+	const repoSlugValid =
+		isValidRepoSlugPart(normalizedOrganization) && isValidRepoSlugPart(normalizedRepository);
+	const derivedRepoId = useMemo(
+		() => (repoSlugValid ? deriveRepoId(normalizedOrganization, normalizedRepository) : null),
+		[normalizedOrganization, normalizedRepository, repoSlugValid],
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		async function checkAuthorization() {
+			if (!bundleBytes) {
+				setAuthorizationState("idle");
+				setAuthorizationMessage(null);
+				return;
+			}
+
+			setAuthorizationState("checking");
+			setAuthorizationMessage(null);
+			try {
+				const { address, sourceLabel: signerSourceLabel } = await getBulletinSigner();
+				const authorized = await checkBulletinAuthorization(address, bundleBytes.length);
+				if (cancelled) {
+					return;
+				}
+				if (authorized) {
+					setAuthorizationState("authorized");
+					setAuthorizationMessage(
+						`Bulletin signer ${shortenAddress(address)} is authorized via ${signerSourceLabel}.`,
+					);
+					return;
+				}
+				setAuthorizationState("unauthorized");
+				setAuthorizationMessage(
+					`Bulletin signer ${shortenAddress(address)} is not authorized to store ${bundleBytes.length} bytes.`,
+				);
+			} catch (cause) {
+				if (cancelled) {
+					return;
+				}
+				setAuthorizationState("unauthorized");
+				setAuthorizationMessage(
+					cause instanceof Error ? cause.message : "Bulletin signer is not available",
+				);
+			}
+		}
+
+		void checkAuthorization();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [bundleBytes, getBulletinSigner]);
+
+	const handleBundleSelected = async (file: File | undefined) => {
+		if (!file) {
+			return;
+		}
+
+		setStatus(null);
+		setBundleName(file.name);
+		const { hash, bytes } = await hashFileWithBytes(file);
+		setBundleBytes(bytes);
+		setBundleHash(hash);
+		setBundleCid(hexHashToCid(hash));
+	};
+
+	const submitCreateRepo = async () => {
+		try {
+			setSubmitting(true);
+			setStatus(null);
+
+			if (!registryAddress) {
+				throw new Error("CRRP registry address is not configured");
+			}
+			if (!repoSlugValid) {
+				throw new Error("Organization and repository are required");
+			}
+			if (!bundleBytes || !bundleCid || !bundleHash) {
+				throw new Error("Select a Git bundle before creating the repository");
+			}
+			if (!bundleName?.toLowerCase().endsWith(".bundle")) {
+				throw new Error("The uploaded artifact must be a .bundle file");
+			}
+
+			const reviewer = reviewerAddress.trim();
+			if (reviewer && !isAddress(reviewer)) {
+				throw new Error("Reviewer address is not a valid EVM address");
+			}
+
+			const contributionRewardAmount = parseOptionalEthAmount(
+				contributionReward,
+				"Contributor reward",
+			);
+			const reviewRewardAmount = parseOptionalEthAmount(reviewReward, "Reviewer reward");
+			const initialDonationAmount = parseOptionalEthAmount(initialDonation, "Initial donation");
+			const headCommitBytes32 = gitCommitHashToBytes32(initialHeadCommit);
+			const repoId = deriveRepoId(normalizedOrganization, normalizedRepository);
+
+			setStatus("Checking Bulletin authorization...");
+			const {
+				address: bulletinAddress,
+				signer: bulletinSigner,
+				sourceLabel: bulletinSourceLabel,
+			} = await getBulletinSigner();
+			const bulletinAuthorized = await checkBulletinAuthorization(
+				bulletinAddress,
+				bundleBytes.length,
+			);
+			if (!bulletinAuthorized) {
+				throw new Error(
+					`Bulletin signer ${bulletinAddress} is not authorized to upload ${bundleBytes.length} bytes`,
+				);
+			}
+
+			setStatus(`Uploading ${bundleName} to Bulletin via ${bulletinSourceLabel}...`);
+			await uploadToBulletin(bundleBytes, bulletinSigner);
+
+			const walletClient = await getWalletClientForWrite();
+			if (!walletClient.account) {
+				throw new Error("No EVM signer is available for repository creation");
+			}
+			const signerAccount = walletClient.account;
+
+			const publicClient = getPublicClient(getStoredEthRpcUrl());
+
+			setStatus("Submitting createRepo transaction...");
+			const createRepoHash = await walletClient.writeContract({
+				address: registryAddress,
+				abi: crrpRegistryAbi,
+				functionName: "createRepo",
+				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, bundleCid],
+				account: signerAccount,
+				chain: walletClient.chain,
+			});
+			await publicClient.waitForTransactionReceipt({ hash: createRepoHash });
+
+			if (reviewer) {
+				setStatus("Granting reviewer role...");
+				const reviewerHash = await walletClient.writeContract({
+					address: registryAddress,
+					abi: crrpRegistryAbi,
+					functionName: "setReviewerRole",
+					args: [repoId, reviewer as Address, true],
+					account: signerAccount,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash: reviewerHash });
+			}
+
+			const treasuryAddress = (await publicClient.readContract({
+				address: registryAddress,
+				abi: crrpRegistryAbi,
+				functionName: "getRepoIncentiveTreasury",
+				args: [repoId],
+			})) as Address;
+			const treasuryConfigured = treasuryAddress !== ZERO_ADDRESS;
+
+			if (contributionRewardAmount > 0n || reviewRewardAmount > 0n) {
+				if (!treasuryConfigured) {
+					throw new Error("Repository treasury is not configured on-chain");
+				}
+				setStatus("Configuring treasury payout rewards...");
+				const payoutHash = await walletClient.writeContract({
+					address: treasuryAddress,
+					abi: crrpTreasuryAbi,
+					functionName: "setPayoutConfig",
+					args: [repoId, contributionRewardAmount, reviewRewardAmount],
+					account: signerAccount,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash: payoutHash });
+			}
+
+			if (initialDonationAmount > 0n) {
+				if (!treasuryConfigured) {
+					throw new Error("Repository treasury is not configured on-chain");
+				}
+				setStatus("Funding treasury...");
+				const donationHash = await walletClient.writeContract({
+					address: treasuryAddress,
+					abi: crrpTreasuryAbi,
+					functionName: "donate",
+					args: [repoId],
+					value: initialDonationAmount,
+					account: signerAccount,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash: donationHash });
+			}
+
+			navigate(
+				`/repo/${encodeURIComponent(normalizedOrganization)}/${encodeURIComponent(normalizedRepository)}`,
+			);
+		} catch (cause) {
+			setStatus(cause instanceof Error ? cause.message : "Repository creation failed");
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	return (
+		<div className="space-y-6">
+			<section className="space-y-3">
+				<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+					<div>
+						<h1 className="page-title">Create Repository</h1>
+						<p className="mt-2 max-w-3xl text-text-secondary">
+							Create a CRRP repository from the web by uploading the canonical Git bundle,
+							deriving its CID, and submitting the initial `HEAD` to the registry.
+						</p>
+					</div>
+					<Link to="/" className="btn-secondary">
+						Back To Repositories
+					</Link>
+				</div>
+				<div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-text-secondary">
+					The bundle is uploaded first. The browser does not parse bundle contents yet, so you
+					must provide the Git `HEAD` commit hash separately. Submit a self-contained
+					`.bundle` for the canonical repository state, not a zip or tarball.
+				</div>
+			</section>
+
+			<section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+				<div className="card space-y-4">
+					<div>
+						<h2 className="section-title">Repository Inputs</h2>
+						<p className="mt-1 text-sm text-text-secondary">
+							The repository id is derived client-side from `organization/repository`.
+							The bundle should reconstruct the same `HEAD` commit you enter below.
+						</p>
+					</div>
+					<div className="grid gap-3 md:grid-cols-2">
+						<div>
+							<label className="label">Organization</label>
+							<input
+								type="text"
+								value={organization}
+								onChange={(event) => setOrganization(event.target.value)}
+								placeholder="my-org"
+								className="input-field w-full"
+							/>
+						</div>
+						<div>
+							<label className="label">Repository</label>
+							<input
+								type="text"
+								value={repository}
+								onChange={(event) => setRepository(event.target.value)}
+								placeholder="my-repo"
+								className="input-field w-full"
+							/>
+						</div>
+					</div>
+					<div>
+						<label className="label">Initial HEAD Commit</label>
+						<input
+							type="text"
+							value={initialHeadCommit}
+							onChange={(event) => setInitialHeadCommit(event.target.value)}
+							placeholder="40-char Git SHA-1 or 64-char SHA-256"
+							className="input-field w-full font-mono"
+						/>
+					</div>
+					<div>
+						<label className="label">Git Bundle</label>
+						<input
+							type="file"
+							accept=".bundle,application/octet-stream"
+							onChange={(event) => void handleBundleSelected(event.target.files?.[0])}
+							className="input-field w-full file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-sm file:text-text-primary"
+						/>
+						<p className="mt-2 text-xs text-text-tertiary">
+							Minimal guidance: from the repository root, create a bundle that contains the
+							canonical state you want to register, for example `git bundle create
+							repo.bundle HEAD`. The commit entered above must be the bundle `HEAD`.
+						</p>
+					</div>
+					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
+						<div>Derived Repo ID</div>
+						<div className="mt-1 font-mono break-all text-text-primary">
+							{derivedRepoId || "Enter a valid organization and repository"}
+						</div>
+						<div className="mt-3">Bundle CID</div>
+						<div className="mt-1 font-mono break-all text-text-primary">
+							{bundleCid || "Select a .bundle file to derive the CID"}
+						</div>
+					</div>
+				</div>
+
+				<div className="card space-y-4">
+					<div>
+						<h2 className="section-title">Signers</h2>
+						<p className="mt-1 text-sm text-text-secondary">
+							Bulletin upload uses a Substrate signer. Repo creation and configuration use
+							an EVM signer.
+						</p>
+					</div>
+					<ValueLine label="EVM signer" value={account ? `${sourceLabel}: ${shortenAddress(account)}` : "Not connected"} />
+					{canUseBrowserWallet ? (
+						<button onClick={() => void connectBrowserWallet()} className="btn-secondary w-full">
+							Connect EVM Browser Wallet
+						</button>
+					) : null}
+					{canUseDevSigner ? (
+						<div>
+							<label className="label">Local EVM Dev Signer</label>
+							<select
+								value={devAccountIndex}
+								onChange={(event) => selectDevAccount(Number(event.target.value))}
+								className="input-field w-full"
+							>
+								<option value={0}>Alice</option>
+								<option value={1}>Bob</option>
+								<option value={2}>Charlie</option>
+							</select>
+						</div>
+					) : null}
+					<div className="border-t border-white/[0.06] pt-4">
+						<label className="label">Bulletin Signer Source</label>
+						<div className="mt-2 flex flex-wrap gap-2">
+							{canUseDevSubstrateSigner ? (
+								<button
+									onClick={() => setSubstrateSource("dev")}
+									className={substrateSource === "dev" ? "btn-primary" : "btn-secondary"}
+								>
+									Local Dev
+								</button>
+							) : null}
+							<button
+								onClick={() => setSubstrateSource("browser")}
+								className={substrateSource === "browser" ? "btn-primary" : "btn-secondary"}
+							>
+								Browser / Host
+							</button>
+						</div>
+						{substrateSource === "dev" && canUseDevSubstrateSigner ? (
+							<div className="mt-3">
+								<label className="label">Local Bulletin Dev Signer</label>
+								<select
+									value={substrateDevAccountIndex}
+									onChange={(event) => setSubstrateDevAccountIndex(Number(event.target.value))}
+									className="input-field w-full"
+								>
+									{substrateDevAccounts.map((devAccount, index) => (
+										<option key={devAccount.address} value={index}>
+											{devAccount.name} ({devAccount.address})
+										</option>
+									))}
+								</select>
+							</div>
+						) : null}
+						{substrateSource === "browser" ? (
+							<div className="mt-3 space-y-3">
+								<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-text-secondary">
+									Host status: {hostStatus}
+									{browserSourceLabel ? ` · ${browserSourceLabel}` : ""}
+								</div>
+								{browserAccounts.length > 0 ? (
+									<div>
+										<label className="label">Browser Bulletin Account</label>
+										<select
+											value={selectedBrowserAccountIndex}
+											onChange={(event) =>
+												setSelectedBrowserAccountIndex(Number(event.target.value))
+											}
+											className="input-field w-full"
+										>
+											{browserAccounts.map((browserAccount, index) => (
+												<option key={browserAccount.address} value={index}>
+													{browserAccount.name || "Account"} ({browserAccount.address})
+												</option>
+											))}
+										</select>
+									</div>
+								) : null}
+								{browserAccounts.length === 0 && availableWallets.length > 0 ? (
+									<div className="flex flex-wrap gap-2">
+										{availableWallets.map((walletName) => (
+											<button
+												key={walletName}
+												onClick={() => void connectSubstrateWallet(walletName)}
+												className="btn-secondary"
+											>
+												Connect {walletName}
+											</button>
+										))}
+									</div>
+								) : null}
+							</div>
+						) : null}
+					</div>
+					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
+						{authorizationState === "idle" ? "Select a bundle to check Bulletin authorization." : null}
+						{authorizationState === "checking" ? "Checking Bulletin authorization..." : null}
+						{authorizationState === "authorized" ? authorizationMessage : null}
+						{authorizationState === "unauthorized" ? authorizationMessage : null}
+					</div>
+				</div>
+			</section>
+
+			<section className="grid gap-4 lg:grid-cols-2">
+				<div className="card space-y-4">
+					<div>
+						<h2 className="section-title">Initial Reviewer Access</h2>
+						<p className="mt-1 text-sm text-text-secondary">
+							Contributors are intended to be permissionless. The only optional access
+							configuration here is the initial reviewer address.
+						</p>
+					</div>
+					<div>
+						<label className="label">Reviewer Address</label>
+						<input
+							type="text"
+							value={reviewerAddress}
+							onChange={(event) => setReviewerAddress(event.target.value)}
+							placeholder="0x..."
+							className="input-field w-full font-mono"
+						/>
+					</div>
+				</div>
+
+				<div className="card space-y-4">
+					<div>
+						<h2 className="section-title">Treasury Configuration</h2>
+						<p className="mt-1 text-sm text-text-secondary">
+							These values are fixed UNIT payouts, not percentages. They do not need to add
+							up to 100. After each accepted merge, the configured contributor reward is
+							accrued once and the reviewer reward is accrued for each approved reviewer.
+						</p>
+					</div>
+					<div className="grid gap-3 md:grid-cols-2">
+						<div>
+							<label className="label">Contributor Reward Per Merge (UNIT)</label>
+							<input
+								type="text"
+								value={contributionReward}
+								onChange={(event) => setContributionReward(event.target.value)}
+								placeholder="0"
+								className="input-field w-full"
+							/>
+						</div>
+						<div>
+							<label className="label">Reviewer Reward Per Approval (UNIT)</label>
+							<input
+								type="text"
+								value={reviewReward}
+								onChange={(event) => setReviewReward(event.target.value)}
+								placeholder="0"
+								className="input-field w-full"
+							/>
+						</div>
+					</div>
+					<div>
+						<label className="label">Initial Treasury Funding (UNIT)</label>
+						<input
+							type="text"
+							value={initialDonation}
+							onChange={(event) => setInitialDonation(event.target.value)}
+							placeholder="0"
+							className="input-field w-full"
+						/>
+						<p className="mt-2 text-xs text-text-tertiary">
+							Funding is optional, but rewards cannot be claimed until the treasury has
+							enough balance.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section className="card space-y-4">
+				<div>
+					<h2 className="section-title">Submit</h2>
+					<p className="mt-1 text-sm text-text-secondary">
+						This runs the Bulletin upload first, then sends the registry and optional
+						configuration transactions.
+					</p>
+				</div>
+				<div className="grid gap-3 md:grid-cols-3">
+					<ValueLine label="Registry" value={registryAddress || "Not configured"} mono />
+					<ValueLine label="Bundle File" value={bundleName || "Not selected"} />
+					<ValueLine label="Bundle Hash" value={bundleHash || "Not computed"} mono />
+				</div>
+				<button
+					onClick={() => void submitCreateRepo()}
+					disabled={submitting}
+					className="btn-primary w-full md:w-auto"
+				>
+					{submitting ? "Creating..." : "Create Repository"}
+				</button>
+				{status ? (
+					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary break-all">
+						{status}
+					</div>
+				) : null}
+			</section>
+		</div>
+	);
+}
+
+function ValueLine({
+	label,
+	value,
+	mono = false,
+}: {
+	label: string;
+	value: string;
+	mono?: boolean;
+}) {
+	return (
+		<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+			<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">{label}</div>
+			<div className={`mt-1 break-all text-sm text-text-primary ${mono ? "font-mono" : ""}`}>
+				{value}
+			</div>
+		</div>
+	);
+}

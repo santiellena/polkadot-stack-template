@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { DEFAULT_REPO_NAME, DEFAULT_REPO_ORGANIZATION } from "../config/crrp";
 import {
 	deriveRepoId,
+	formatGitCommitHash,
 	formatRepoTimestamp,
 	isValidRepoSlugPart,
 	normalizeRepoSlugPart,
@@ -34,12 +35,19 @@ export default function HomeRoute() {
 	return (
 		<div className="space-y-8">
 			<section className="space-y-3">
-				<h1 className="page-title">CRRP Repository Registry</h1>
-				<p className="text-text-secondary max-w-3xl leading-relaxed">
-					Read the canonical repository state from the registry, inspect merged commits,
-					check your roles, and fund the incentives treasury. Proposal creation and other
-					repo-state write actions stay out of the web MVP for now.
-				</p>
+				<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+					<div>
+						<h1 className="page-title">CRRP Repository Registry</h1>
+						<p className="text-text-secondary max-w-3xl leading-relaxed">
+							Read the canonical repository state from the registry, inspect merged
+							commits, check your roles, fund the incentives treasury, and create new
+							repositories from a Git bundle.
+						</p>
+					</div>
+					<Link to="/create" className="btn-primary">
+						Create Repository
+					</Link>
+				</div>
 			</section>
 
 			<section className="card space-y-4">
@@ -125,7 +133,7 @@ export default function HomeRoute() {
 									<div className="text-xs text-text-tertiary font-mono">{repo.repoId}</div>
 								</div>
 								<div className="grid gap-2 text-sm text-text-secondary md:text-right">
-									<div>HEAD {shortenHash(repo.headCommit)}</div>
+									<div>HEAD {shortenHash(formatGitCommitHash(repo.headCommit))}</div>
 									<div>{repo.headCid || "No CID recorded"}</div>
 									<div>{formatRepoTimestamp(repo.createdAt)}</div>
 								</div>

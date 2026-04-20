@@ -13,6 +13,18 @@ import { getStoredEthRpcUrl } from "../config/network";
 export const crrpRegistryAbi = [
 	{
 		type: "function",
+		name: "createRepo",
+		inputs: [
+			{ name: "organization", type: "string" },
+			{ name: "name", type: "string" },
+			{ name: "initialHeadCommit", type: "bytes32" },
+			{ name: "initialHeadCid", type: "string" },
+		],
+		outputs: [{ name: "repoId", type: "bytes32" }],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
 		name: "getRepo",
 		inputs: [{ name: "repoId", type: "bytes32" }],
 		outputs: [
@@ -80,6 +92,28 @@ export const crrpRegistryAbi = [
 		outputs: [{ name: "", type: "bool" }],
 		stateMutability: "view",
 	},
+	{
+		type: "function",
+		name: "setContributorRole",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "account", type: "address" },
+			{ name: "enabled", type: "bool" },
+		],
+		outputs: [],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
+		name: "setReviewerRole",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "account", type: "address" },
+			{ name: "enabled", type: "bool" },
+		],
+		outputs: [],
+		stateMutability: "nonpayable",
+	},
 ] as const;
 
 export const crrpTreasuryAbi = [
@@ -96,6 +130,17 @@ export const crrpTreasuryAbi = [
 		inputs: [{ name: "repoId", type: "bytes32" }],
 		outputs: [{ name: "", type: "uint256" }],
 		stateMutability: "view",
+	},
+	{
+		type: "function",
+		name: "setPayoutConfig",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "contributionReward", type: "uint256" },
+			{ name: "reviewReward", type: "uint256" },
+		],
+		outputs: [],
+		stateMutability: "nonpayable",
 	},
 	{
 		type: "function",
@@ -237,7 +282,7 @@ const blockTimestampCache = new Map<string, number>();
 const repoMetadataCache = new Map<string, Promise<RepoMetadataReadResult>>();
 const proposalContributorCache = new Map<string, Promise<Address>>();
 
-function getRegistryAddress(): Address {
+export function getRegistryAddress(): Address {
 	if (!DEFAULT_REGISTRY_ADDRESS) {
 		throw new Error("CRRP registry address is not configured");
 	}
@@ -266,6 +311,34 @@ export function normalizeRepoSlugPart(value: string) {
 
 export function isValidRepoSlugPart(value: string) {
 	return value.trim().length > 0 && !value.includes("/");
+}
+
+export function formatGitCommitHash(value: string) {
+	if (!value) return value;
+	const body = value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+	if (!/^[0-9a-fA-F]+$/.test(body)) {
+		return value;
+	}
+	if (/^0{24}[0-9a-fA-F]{40}$/.test(body)) {
+		return body.slice(24).toLowerCase();
+	}
+	return body.toLowerCase();
+}
+
+export function gitCommitHashToBytes32(value: string): Hex {
+	const trimmed = value.trim();
+	const body =
+		trimmed.startsWith("0x") || trimmed.startsWith("0X") ? trimmed.slice(2) : trimmed;
+	if (!/^[0-9a-fA-F]+$/.test(body)) {
+		throw new Error("Commit hash must be hexadecimal");
+	}
+	if (body.length === 40) {
+		return `0x${body.padStart(64, "0").toLowerCase()}` as Hex;
+	}
+	if (body.length === 64) {
+		return `0x${body.toLowerCase()}` as Hex;
+	}
+	throw new Error("Commit hash must be 40 or 64 hex characters");
 }
 
 export function shortenHash(value: string, chars = 8) {
@@ -770,11 +843,11 @@ export async function readRepoOverview(
 		proposalCount: repo[3],
 		releaseCount: repo[4],
 		roles,
-		treasuryBalance: treasuryData?.[0] ?? null,
-		contributionReward: treasuryData?.[1]?.[0] ?? null,
-		reviewReward: treasuryData?.[1]?.[1] ?? null,
-		totalClaimable: treasuryData?.[2] ?? null,
-		unfundedClaimable: treasuryData?.[3] ?? null,
+		treasuryBalance: treasuryData?.[0] ?? 0n,
+		contributionReward: treasuryData?.[1]?.[0] ?? 0n,
+		reviewReward: treasuryData?.[1]?.[1] ?? 0n,
+		totalClaimable: treasuryData?.[2] ?? 0n,
+		unfundedClaimable: treasuryData?.[3] ?? 0n,
 		commitList: history,
 		releases,
 		cloneUrl: buildBundleUrl(repo[2]),

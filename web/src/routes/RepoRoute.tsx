@@ -6,6 +6,7 @@ import { useRepoOverview } from "../features/repo/useRepoOverview";
 import { TreasuryDonationCard } from "../features/treasury/TreasuryDonationCard";
 import {
 	formatEthAmount,
+	formatGitCommitHash,
 	formatRepoTimestamp,
 	shortenAddress,
 	shortenHash,
@@ -77,7 +78,7 @@ export default function RepoRoute() {
 				<ValueCard label="Maintainer" value={repo.maintainer} mono />
 				<ValueCard label="Organization" value={repo.organization} />
 				<ValueCard label="Repository" value={repo.repository} />
-				<ValueCard label="Latest Commit" value={repo.latestCommitHash} mono />
+				<ValueCard label="Latest Commit" value={formatGitCommitHash(repo.latestCommitHash)} mono />
 				<ValueCard label="Latest CID" value={repo.latestCid || "Not set"} mono />
 				<ValueCard label="Treasury" value={repo.treasuryAddress || "Not configured"} mono />
 				<ValueCard label="Proposal Count" value={repo.proposalCount.toString()} />
@@ -151,7 +152,7 @@ cd crrp-${repo.repoId.slice(2, 10)}`}
 						</p>
 					</div>
 					<div className="space-y-3">
-						<StateRow label="HEAD commit" value={repo.latestCommitHash} />
+						<StateRow label="HEAD commit" value={formatGitCommitHash(repo.latestCommitHash)} />
 						<StateRow label="HEAD CID" value={repo.latestCid} />
 						<StateRow label="Latest merge timestamp" value={formatRepoTimestamp(repo.commitList[0]?.timestamp ?? null)} />
 						<StateRow label="Recent canonical commits" value={repo.commitList.length.toString()} />
@@ -181,7 +182,7 @@ cd crrp-${repo.repoId.slice(2, 10)}`}
 									</div>
 								</div>
 								<div className="mt-2 text-xs text-text-secondary font-mono">
-									{shortenHash(entry.commitHash)}
+									{shortenHash(formatGitCommitHash(entry.commitHash))}
 								</div>
 								<div className="mt-1 text-xs text-text-secondary">
 									Actor {shortenAddress(entry.actor)}

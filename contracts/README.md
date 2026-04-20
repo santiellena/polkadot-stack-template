@@ -61,6 +61,27 @@ The deploy scripts update:
 - `deployments.json` in the repo root for CLI usage
 - [`../web/src/config/deployments.ts`](../web/src/config/deployments.ts) for the frontend
 
+## Register CRRP Repo
+
+Preferred path: use the Rust CLI so repo registration matches the same CRRP flow used by contributors.
+
+```bash
+cargo run -p stack-cli -- create-repo \
+  --repo /path/to/repo \
+  --organization acme \
+  --repository crrp \
+  --registry 0x<registry-address> \
+  --signer alice \
+  --initial-cid mock://init
+```
+
+Notes:
+
+- Repo ID is now derived on-chain and in clients as `keccak256("organization/repository")`.
+- `--initial-commit` defaults to `HEAD`.
+- Contributor/reviewer roles are granted by default to signer-derived addresses (override with `--contributor` / `--reviewer`).
+- Use `--skip-role-grants` if you only want `createRepo`.
+
 ## Common Commands
 
 From the repo root:

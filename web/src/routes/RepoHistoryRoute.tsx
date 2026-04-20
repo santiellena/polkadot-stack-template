@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
-import { formatRepoTimestamp, shortenAddress, shortenHash } from "../lib/crrp";
+import { formatGitCommitHash, formatRepoTimestamp, shortenAddress, shortenHash } from "../lib/crrp";
 
 export default function RepoHistoryRoute() {
 	const { organization, repository } = useParams();
@@ -64,7 +64,7 @@ export default function RepoHistoryRoute() {
 										{entry.type === "initial" ? "Initial HEAD" : "Merged Proposal"}
 									</div>
 									<div className="text-sm text-text-secondary font-mono">
-										{entry.commitHash}
+										{formatGitCommitHash(entry.commitHash)}
 									</div>
 									<div className="text-sm text-text-secondary break-all">
 										Bundle CID {entry.cid || "Not recorded"}
@@ -78,7 +78,7 @@ export default function RepoHistoryRoute() {
 											? "Repo creation"
 											: `Proposal #${entry.proposalId.toString()}`}
 									</div>
-									<div>{shortenHash(entry.commitHash)}</div>
+									<div>{shortenHash(formatGitCommitHash(entry.commitHash))}</div>
 								</div>
 							</div>
 						</div>
@@ -113,7 +113,7 @@ export default function RepoHistoryRoute() {
 									</div>
 								</div>
 								<div className="mt-2 text-sm text-text-secondary font-mono break-all">
-									{release.commitHash}
+									{formatGitCommitHash(release.commitHash)}
 								</div>
 								<div className="mt-1 text-sm text-text-secondary break-all">
 									{release.cid}

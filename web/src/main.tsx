@@ -5,6 +5,7 @@ import App from "./App";
 import "./index.css";
 
 const HomeRoute = lazy(() => import("./routes/HomeRoute"));
+const CreateRepoRoute = lazy(() => import("./routes/CreateRepoRoute"));
 const LeaderboardRoute = lazy(() => import("./routes/LeaderboardRoute"));
 const RepoRoute = lazy(() => import("./routes/RepoRoute"));
 const RepoHistoryRoute = lazy(() => import("./routes/RepoHistoryRoute"));
@@ -28,6 +29,14 @@ createRoot(document.getElementById("root")!).render(
 						element={
 							<Suspense fallback={routeFallback}>
 								<HomeRoute />
+							</Suspense>
+						}
+					/>
+					<Route
+						path="create"
+						element={
+							<Suspense fallback={routeFallback}>
+								<CreateRepoRoute />
 							</Suspense>
 						}
 					/>
