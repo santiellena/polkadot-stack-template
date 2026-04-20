@@ -108,7 +108,7 @@ export default function RepoRoute() {
 				<ValueCard label="Registry" value={repo.registryAddress} mono />
 			</section>
 
-			<section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+			<section className="grid gap-4 lg:grid-cols-[3fr_2fr]">
 				<div className="card space-y-4">
 					<div>
 						<h2 className="section-title">Download And Clone</h2>
@@ -129,6 +129,7 @@ export default function RepoRoute() {
 								Download Bundle
 							</a>
 							<CommandBlock
+								
 								command={`curl -L ${repo.cloneUrl} -o crrp-${repo.repoId.slice(2, 10)}.bundle
 git clone crrp-${repo.repoId.slice(2, 10)}.bundle crrp-${repo.repoId.slice(2, 10)}
 cd crrp-${repo.repoId.slice(2, 10)}`}
@@ -305,7 +306,7 @@ function RoleBadge({ label, active }: { label: string; active: boolean }) {
 
 function CommandBlock({ command }: { command: string }) {
 	return (
-		<pre className="rounded-lg border border-white/[0.06] bg-black/20 p-4 text-xs text-text-primary overflow-x-auto">
+		<pre className="w-full rounded-lg border border-white/[0.06] bg-black/20 p-4 text-xs text-text-primary overflow-x-auto whitespace-pre-wrap break-words">
 			<code>{command}</code>
 		</pre>
 	);

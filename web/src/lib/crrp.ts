@@ -124,6 +124,18 @@ export const crrpRegistryAbi = [
 	},
 	{
 		type: "function",
+		name: "mergeProposal",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "proposalId", type: "uint256" },
+			{ name: "finalCommitHash", type: "bytes32" },
+			{ name: "finalCid", type: "string" },
+		],
+		outputs: [],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
 		name: "getReview",
 		inputs: [
 			{ name: "repoId", type: "bytes32" },

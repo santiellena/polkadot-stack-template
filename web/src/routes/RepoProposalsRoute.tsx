@@ -4,6 +4,7 @@ import { type Address, type Hex } from "viem";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
 import { useWalletSession } from "../features/auth/useWalletSession";
+import { MergePanel } from "../features/maintainer/MergePanel";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
 import {
 	buildBundleUrl,
@@ -248,8 +249,8 @@ export default function RepoProposalsRoute() {
 							account?.toLowerCase() === proposal.contributor.toLowerCase();
 						const canReview =
 							repo.roles.isReviewer &&
-							!repo.roles.isMaintainer &&
-							!isOwnProposal &&
+							//!repo.roles.isMaintainer &&
+							// !isOwnProposal &&
 							proposal.status === 1 &&
 							!proposal.reviewerVote?.exists;
 						const bundleUrl = buildBundleUrl(proposal.proposedCid);
@@ -346,7 +347,18 @@ export default function RepoProposalsRoute() {
 									) : null}
 								</div>
 
-								{repo.roles.isReviewer && !repo.roles.isMaintainer ? (
+								{repo.roles.isMaintainer && proposal.status === 1 ? (
+									<MergePanel
+										repoId={repo.repoId}
+										proposalId={proposal.id}
+										proposedCommit={proposal.proposedCommit}
+										proposedCid={proposal.proposedCid}
+										canMerge={proposal.approvals > 0n && proposal.rejections === 0n}
+										onMerged={refresh}
+									/>
+								) : null}
+
+								{repo.roles.isReviewer /*&& !repo.roles.isMaintainer*/ ? (
 									<div className="border-t border-white/[0.06] pt-3">
 										{proposal.reviewerVote?.exists ? (
 											<span
@@ -359,41 +371,43 @@ export default function RepoProposalsRoute() {
 												this proposal.
 												{proposalTxStatus ? ` ${proposalTxStatus}` : ""}
 											</span>
-										) : isOwnProposal ? (
-											<span className="text-sm text-text-tertiary">
-												You cannot review your own proposal.
-											</span>
-										) : proposal.status !== 1 ? (
+										) 
+										// : isOwnProposal ? (
+										// 	<span className="text-sm text-text-tertiary">
+										// 		You cannot review your own proposal.
+										// 	</span>
+										// ) 
+										: proposal.status !== 1 ? (
 											<span className="text-sm text-text-tertiary">
 												This proposal is no longer open for review.
 											</span>
 										) : canReview ? (
-											<div className="flex flex-wrap items-center gap-3">
-												<span className="text-sm text-text-secondary">
-													Submit your review:
-												</span>
-												<div className="flex gap-2">
-													<button
+											<div className="space-y-3">
+												<div className="text-sm font-medium text-text-primary">
+													Submit Your Review
+												</div>
+												<div className="grid gap-3 sm:grid-cols-2">
+													<ReviewOption
+														variant="approve"
+														title="Looks Good"
+														description="Endorse this proposal. The maintainer will decide whether to merge it — your approval does not trigger a merge."
+														label={isSubmitting ? "Submitting…" : "Approve"}
 														onClick={() => void submitReview(proposal.id, true)}
 														disabled={isSubmitting}
-														className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-													>
-														{isSubmitting ? "..." : "Approve"}
-													</button>
-													<button
-														onClick={() =>
-															void submitReview(proposal.id, false)
-														}
+													/>
+													<ReviewOption
+														variant="reject"
+														title="Not Relevant"
+														description="Close this proposal permanently. Use this when the contribution doesn't make sense or isn't ready."
+														label={isSubmitting ? "Submitting…" : "Reject"}
+														onClick={() => void submitReview(proposal.id, false)}
 														disabled={isSubmitting}
-														className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-													>
-														{isSubmitting ? "..." : "Reject"}
-													</button>
+													/>
 												</div>
 												{proposalTxStatus ? (
-													<span className="break-all text-sm text-text-secondary">
+													<div className="break-all text-sm text-text-secondary">
 														{proposalTxStatus}
-													</span>
+													</div>
 												) : null}
 											</div>
 										) : null}
@@ -404,6 +418,50 @@ export default function RepoProposalsRoute() {
 					})}
 				</div>
 			)}
+		</div>
+	);
+}
+
+function ReviewOption({
+	variant,
+	title,
+	description,
+	label,
+	onClick,
+	disabled,
+}: {
+	variant: "approve" | "reject";
+	title: string;
+	description: string;
+	label: string;
+	onClick: () => void;
+	disabled: boolean;
+}) {
+	const styles =
+		variant === "approve"
+			? {
+					card: "border-emerald-500/20 bg-emerald-500/5",
+					title: "text-emerald-300",
+					button:
+						"border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
+				}
+			: {
+					card: "border-red-500/20 bg-red-500/5",
+					title: "text-red-300",
+					button: "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
+				};
+
+	return (
+		<div className={`space-y-2 rounded-lg border p-3 ${styles.card}`}>
+			<div className={`text-sm font-medium ${styles.title}`}>{title}</div>
+			<p className="text-xs text-text-secondary">{description}</p>
+			<button
+				onClick={onClick}
+				disabled={disabled}
+				className={`w-full rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50 ${styles.button}`}
+			>
+				{label}
+			</button>
 		</div>
 	);
 }

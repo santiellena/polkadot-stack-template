@@ -64,6 +64,8 @@ export default function CreateRepoRoute() {
 	const [contributionReward, setContributionReward] = useState("0");
 	const [reviewReward, setReviewReward] = useState("0");
 	const [initialDonation, setInitialDonation] = useState("0");
+	const [cidMode, setCidMode] = useState<"upload" | "direct">("upload");
+	const [directCid, setDirectCid] = useState("");
 	const [bundleName, setBundleName] = useState<string | null>(null);
 	const [bundleBytes, setBundleBytes] = useState<Uint8Array | null>(null);
 	const [bundleHash, setBundleHash] = useState<`0x${string}` | null>(null);
@@ -160,12 +162,20 @@ export default function CreateRepoRoute() {
 			if (!repoSlugValid) {
 				throw new Error("Organization and repository are required");
 			}
-			if (!bundleBytes || !bundleCid || !bundleHash) {
-				throw new Error("Select a Git bundle before creating the repository");
+			if (cidMode === "upload") {
+				if (!bundleBytes || !bundleCid || !bundleHash) {
+					throw new Error("Select a Git bundle before creating the repository");
+				}
+				if (!bundleName?.toLowerCase().endsWith(".bundle")) {
+					throw new Error("The uploaded artifact must be a .bundle file");
+				}
+			} else {
+				if (!directCid.trim()) {
+					throw new Error("Enter a bundle CID");
+				}
 			}
-			if (!bundleName?.toLowerCase().endsWith(".bundle")) {
-				throw new Error("The uploaded artifact must be a .bundle file");
-			}
+
+			const effectiveCid = cidMode === "direct" ? directCid.trim() : bundleCid!;
 
 			const reviewer = reviewerAddress.trim();
 			if (reviewer && !isAddress(reviewer)) {
@@ -181,24 +191,26 @@ export default function CreateRepoRoute() {
 			const headCommitBytes32 = gitCommitHashToBytes32(initialHeadCommit);
 			const repoId = deriveRepoId(normalizedOrganization, normalizedRepository);
 
-			setStatus("Checking Bulletin authorization...");
-			const {
-				address: bulletinAddress,
-				signer: bulletinSigner,
-				sourceLabel: bulletinSourceLabel,
-			} = await getBulletinSigner();
-			const bulletinAuthorized = await checkBulletinAuthorization(
-				bulletinAddress,
-				bundleBytes.length,
-			);
-			if (!bulletinAuthorized) {
-				throw new Error(
-					`Bulletin signer ${bulletinAddress} is not authorized to upload ${bundleBytes.length} bytes`,
+			if (cidMode === "upload") {
+				setStatus("Checking Bulletin authorization...");
+				const {
+					address: bulletinAddress,
+					signer: bulletinSigner,
+					sourceLabel: bulletinSourceLabel,
+				} = await getBulletinSigner();
+				const bulletinAuthorized = await checkBulletinAuthorization(
+					bulletinAddress,
+					bundleBytes!.length,
 				);
-			}
+				if (!bulletinAuthorized) {
+					throw new Error(
+						`Bulletin signer ${bulletinAddress} is not authorized to upload ${bundleBytes!.length} bytes`,
+					);
+				}
 
-			setStatus(`Uploading ${bundleName} to Bulletin via ${bulletinSourceLabel}...`);
-			await uploadToBulletin(bundleBytes, bulletinSigner);
+				setStatus(`Uploading ${bundleName} to Bulletin via ${bulletinSourceLabel}...`);
+				await uploadToBulletin(bundleBytes!, bulletinSigner);
+			}
 
 			const walletClient = await getWalletClientForWrite();
 			if (!walletClient.account) {
@@ -213,7 +225,7 @@ export default function CreateRepoRoute() {
 				address: registryAddress,
 				abi: crrpRegistryAbi,
 				functionName: "createRepo",
-				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, bundleCid, permissionlessContributions],
+				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, effectiveCid, permissionlessContributions],
 				account: signerAccount,
 				chain: walletClient.chain,
 			});
@@ -317,9 +329,9 @@ export default function CreateRepoRoute() {
 					</Link>
 				</div>
 				<div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-text-secondary">
-					The bundle is uploaded first. The browser does not parse bundle contents yet, so you
-					must provide the Git `HEAD` commit hash separately. Submit a self-contained
-					`.bundle` for the canonical repository state, not a zip or tarball.
+					{cidMode === "upload"
+						? "The bundle is uploaded first to the Bulletin chain. The browser does not parse bundle contents, so you must provide the Git HEAD commit hash separately."
+						: "Direct CID mode: supply a CID from an external Bulletin upload. The bundle must already be stored on the Bulletin chain."}
 				</div>
 			</section>
 
@@ -364,19 +376,58 @@ export default function CreateRepoRoute() {
 							className="input-field w-full font-mono"
 						/>
 					</div>
-					<div>
-						<label className="label">Git Bundle</label>
-						<input
-							type="file"
-							accept=".bundle,application/octet-stream"
-							onChange={(event) => void handleBundleSelected(event.target.files?.[0])}
-							className="input-field w-full file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-sm file:text-text-primary"
-						/>
-						<p className="mt-2 text-xs text-text-tertiary">
-							Minimal guidance: from the repository root, create a bundle that contains the
-							canonical state you want to register, for example `git bundle create
-							repo.bundle HEAD`. The commit entered above must be the bundle `HEAD`.
-						</p>
+					<div className="space-y-3">
+						<label className="label">Bundle Source</label>
+						<div className="flex gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] p-1">
+							<button
+								type="button"
+								onClick={() => setCidMode("upload")}
+								className={
+									cidMode === "upload"
+										? "btn-primary flex-1 py-1.5 text-sm"
+										: "flex-1 rounded-md py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+								}
+							>
+								Upload Bundle
+							</button>
+							<button
+								type="button"
+								onClick={() => setCidMode("direct")}
+								className={
+									cidMode === "direct"
+										? "btn-primary flex-1 py-1.5 text-sm"
+										: "flex-1 rounded-md py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+								}
+							>
+								Enter CID Directly
+							</button>
+						</div>
+						{cidMode === "upload" ? (
+							<div>
+								<input
+									type="file"
+									accept=".bundle,application/octet-stream"
+									onChange={(event) => void handleBundleSelected(event.target.files?.[0])}
+									className="input-field w-full file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-sm file:text-text-primary"
+								/>
+								<p className="mt-2 text-xs text-text-tertiary">
+									From the repository root: `git bundle create repo.bundle HEAD`. The commit entered above must be the bundle `HEAD`.
+								</p>
+							</div>
+						) : (
+							<div>
+								<input
+									type="text"
+									value={directCid}
+									onChange={(e) => setDirectCid(e.target.value)}
+									placeholder="bafk2bz..."
+									className="input-field w-full font-mono"
+								/>
+								<p className="mt-2 text-xs text-text-tertiary">
+									CID of a bundle already uploaded externally to the Bulletin chain.
+								</p>
+							</div>
+						)}
 					</div>
 					<div className="space-y-3">
 						<label className="label">Contribution Mode</label>
@@ -447,7 +498,9 @@ export default function CreateRepoRoute() {
 						</div>
 						<div className="mt-3">Bundle CID</div>
 						<div className="mt-1 font-mono break-all text-text-primary">
-							{bundleCid || "Select a .bundle file to derive the CID"}
+							{cidMode === "direct"
+								? (directCid.trim() || "Enter a CID above")
+								: (bundleCid || "Select a .bundle file to derive the CID")}
 						</div>
 					</div>
 				</div>
@@ -480,86 +533,90 @@ export default function CreateRepoRoute() {
 							</select>
 						</div>
 					) : null}
-					<div className="border-t border-white/[0.06] pt-4">
-						<label className="label">Bulletin Signer Source</label>
-						<div className="mt-2 flex flex-wrap gap-2">
-							{canUseDevSubstrateSigner ? (
-								<button
-									onClick={() => setSubstrateSource("dev")}
-									className={substrateSource === "dev" ? "btn-primary" : "btn-secondary"}
-								>
-									Local Dev
-								</button>
-							) : null}
-							<button
-								onClick={() => setSubstrateSource("browser")}
-								className={substrateSource === "browser" ? "btn-primary" : "btn-secondary"}
-							>
-								Browser / Host
-							</button>
-						</div>
-						{substrateSource === "dev" && canUseDevSubstrateSigner ? (
-							<div className="mt-3">
-								<label className="label">Local Bulletin Dev Signer</label>
-								<select
-									value={substrateDevAccountIndex}
-									onChange={(event) => setSubstrateDevAccountIndex(Number(event.target.value))}
-									className="input-field w-full"
-								>
-									{substrateDevAccounts.map((devAccount, index) => (
-										<option key={devAccount.address} value={index}>
-											{devAccount.name} ({devAccount.address})
-										</option>
-									))}
-								</select>
-							</div>
-						) : null}
-						{substrateSource === "browser" ? (
-							<div className="mt-3 space-y-3">
-								<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-text-secondary">
-									Host status: {hostStatus}
-									{browserSourceLabel ? ` · ${browserSourceLabel}` : ""}
+					{cidMode === "upload" ? (
+						<>
+							<div className="border-t border-white/[0.06] pt-4">
+								<label className="label">Bulletin Signer Source</label>
+								<div className="mt-2 flex flex-wrap gap-2">
+									{canUseDevSubstrateSigner ? (
+										<button
+											onClick={() => setSubstrateSource("dev")}
+											className={substrateSource === "dev" ? "btn-primary" : "btn-secondary"}
+										>
+											Local Dev
+										</button>
+									) : null}
+									<button
+										onClick={() => setSubstrateSource("browser")}
+										className={substrateSource === "browser" ? "btn-primary" : "btn-secondary"}
+									>
+										Browser / Host
+									</button>
 								</div>
-								{browserAccounts.length > 0 ? (
-									<div>
-										<label className="label">Browser Bulletin Account</label>
+								{substrateSource === "dev" && canUseDevSubstrateSigner ? (
+									<div className="mt-3">
+										<label className="label">Local Bulletin Dev Signer</label>
 										<select
-											value={selectedBrowserAccountIndex}
-											onChange={(event) =>
-												setSelectedBrowserAccountIndex(Number(event.target.value))
-											}
+											value={substrateDevAccountIndex}
+											onChange={(event) => setSubstrateDevAccountIndex(Number(event.target.value))}
 											className="input-field w-full"
 										>
-											{browserAccounts.map((browserAccount, index) => (
-												<option key={browserAccount.address} value={index}>
-													{browserAccount.name || "Account"} ({browserAccount.address})
+											{substrateDevAccounts.map((devAccount, index) => (
+												<option key={devAccount.address} value={index}>
+													{devAccount.name} ({devAccount.address})
 												</option>
 											))}
 										</select>
 									</div>
 								) : null}
-								{browserAccounts.length === 0 && availableWallets.length > 0 ? (
-									<div className="flex flex-wrap gap-2">
-										{availableWallets.map((walletName) => (
-											<button
-												key={walletName}
-												onClick={() => void connectSubstrateWallet(walletName)}
-												className="btn-secondary"
-											>
-												Connect {walletName}
-											</button>
-										))}
+								{substrateSource === "browser" ? (
+									<div className="mt-3 space-y-3">
+										<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-text-secondary">
+											Host status: {hostStatus}
+											{browserSourceLabel ? ` · ${browserSourceLabel}` : ""}
+										</div>
+										{browserAccounts.length > 0 ? (
+											<div>
+												<label className="label">Browser Bulletin Account</label>
+												<select
+													value={selectedBrowserAccountIndex}
+													onChange={(event) =>
+														setSelectedBrowserAccountIndex(Number(event.target.value))
+													}
+													className="input-field w-full"
+												>
+													{browserAccounts.map((browserAccount, index) => (
+														<option key={browserAccount.address} value={index}>
+															{browserAccount.name || "Account"} ({browserAccount.address})
+														</option>
+													))}
+												</select>
+											</div>
+										) : null}
+										{browserAccounts.length === 0 && availableWallets.length > 0 ? (
+											<div className="flex flex-wrap gap-2">
+												{availableWallets.map((walletName) => (
+													<button
+														key={walletName}
+														onClick={() => void connectSubstrateWallet(walletName)}
+														className="btn-secondary"
+													>
+														Connect {walletName}
+													</button>
+												))}
+											</div>
+										) : null}
 									</div>
 								) : null}
 							</div>
-						) : null}
-					</div>
-					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
-						{authorizationState === "idle" ? "Select a bundle to check Bulletin authorization." : null}
-						{authorizationState === "checking" ? "Checking Bulletin authorization..." : null}
-						{authorizationState === "authorized" ? authorizationMessage : null}
-						{authorizationState === "unauthorized" ? authorizationMessage : null}
-					</div>
+							<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
+								{authorizationState === "idle" ? "Select a bundle to check Bulletin authorization." : null}
+								{authorizationState === "checking" ? "Checking Bulletin authorization..." : null}
+								{authorizationState === "authorized" ? authorizationMessage : null}
+								{authorizationState === "unauthorized" ? authorizationMessage : null}
+							</div>
+						</>
+					) : null}
 				</div>
 			</section>
 
@@ -636,14 +693,21 @@ export default function CreateRepoRoute() {
 				<div>
 					<h2 className="section-title">Submit</h2>
 					<p className="mt-1 text-sm text-text-secondary">
-						This runs the Bulletin upload first, then sends the registry and optional
-						configuration transactions.
+						{cidMode === "upload"
+							? "This runs the Bulletin upload first, then sends the registry and optional configuration transactions."
+							: "This sends the registry and optional configuration transactions using the provided CID."}
 					</p>
 				</div>
 				<div className="grid gap-3 md:grid-cols-3">
 					<ValueLine label="Registry" value={registryAddress || "Not configured"} mono />
-					<ValueLine label="Bundle File" value={bundleName || "Not selected"} />
-					<ValueLine label="Bundle Hash" value={bundleHash || "Not computed"} mono />
+					{cidMode === "upload" ? (
+						<>
+							<ValueLine label="Bundle File" value={bundleName || "Not selected"} />
+							<ValueLine label="Bundle Hash" value={bundleHash || "Not computed"} mono />
+						</>
+					) : (
+						<ValueLine label="Bundle CID" value={directCid.trim() || "Not entered"} mono />
+					)}
 				</div>
 				<button
 					onClick={() => void submitCreateRepo()}

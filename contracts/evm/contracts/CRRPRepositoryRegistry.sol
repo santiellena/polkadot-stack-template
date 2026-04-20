@@ -215,8 +215,8 @@ contract CRRPRepositoryRegistry {
         Proposal storage proposal = proposals[repoId][proposalId];
         require(proposal.status == ProposalStatus.Open, "Proposal not open");
         require(reviewerRoles[repoId][msg.sender], "Reviewer role required");
-        require(msg.sender != repo.maintainer, "Maintainer cannot review");
-        require(msg.sender != proposal.contributor, "Contributor cannot review");
+        // require(msg.sender != repo.maintainer, "Maintainer cannot review");
+        // require(msg.sender != proposal.contributor, "Contributor cannot review"); allow this for DEV so I do everything with the same account
         require(!reviews[repoId][proposalId][msg.sender].exists, "Already reviewed");
 
         reviews[repoId][proposalId][msg.sender] = Review({exists: true, approved: approved});
