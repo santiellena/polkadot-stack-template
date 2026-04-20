@@ -129,11 +129,36 @@ export default function RepoRoute() {
 								Download Bundle
 							</a>
 							<CommandBlock
-								
-								command={`curl -L ${repo.cloneUrl} -o crrp-${repo.repoId.slice(2, 10)}.bundle
+	command={`# Download the bundle from IPFS
+curl -L ${repo.cloneUrl} -o crrp-${repo.repoId.slice(2, 10)}.bundle
+
+# OPTION 1 — Clone into a new repository
+
+# This creates a brand new repo from the bundle
 git clone crrp-${repo.repoId.slice(2, 10)}.bundle crrp-${repo.repoId.slice(2, 10)}
-cd crrp-${repo.repoId.slice(2, 10)}`}
-							/>
+cd crrp-${repo.repoId.slice(2, 10)}
+
+# OPTION 2 — Fetch into an existing repo
+
+# Go to your already existing local repository
+cd /path/to/your/existing-repo
+
+# Inspect which refs are available in the bundle
+git bundle list-heads ../crrp-${repo.repoId.slice(2, 10)}.bundle
+
+# Fetch a specific branch from the bundle without merging it
+git fetch ../crrp-${repo.repoId.slice(2, 10)}.bundle main
+
+# Or fetch it directly into a local branch called bundle-main
+git fetch ../crrp-${repo.repoId.slice(2, 10)}.bundle main:bundle-main
+
+# Inspect the fetched branch
+git log bundle-main --oneline
+
+# Merge it if you want
+git checkout main
+git merge bundle-main`}
+/>
 						</>
 					) : (
 						<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
