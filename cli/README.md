@@ -5,6 +5,7 @@ This folder contains the Rust CLI package `stack-cli`, which builds the `crrp` b
 The current command surface is CRRP-focused:
 
 - `config` (`init`, `show`)
+- `create-repo`
 - `propose`
 - `fetch`
 - `review`
@@ -15,7 +16,7 @@ The current command surface is CRRP-focused:
 - `proposals`
 - `chain` (`info`, `blocks`, `statement-submit`, `statement-dump`)
 
-Important: most CRRP commands are still `skeleton` flows. `propose` in `--mock` mode now creates a real git bundle, derives a mock CID, and records a local proposal submission.
+Important: most CRRP commands are still `skeleton` flows. `create-repo` is implemented for both RPC and mock backends, and `propose` in `--mock` mode creates a real git bundle, derives a mock CID, and records a local proposal submission.
 
 ## Run
 
@@ -66,9 +67,9 @@ Initialize/show repository-local CRRP configuration in `.crrp/`.
 
 - `config init`
   - writes `.crrp/config.json`
-  - can also write `.crrp/repo-id`
+  - can also write `.crrp/repo-slug.json`
 - `config show`
-  - prints current repo config and repo id
+  - prints current repo config, repository slug, and derived repo id
 
 Examples:
 
@@ -79,7 +80,8 @@ cargo run -p stack-cli -- config init --interactive
 # Non-interactive setup
 cargo run -p stack-cli -- config init \
   --repo /path/to/repo \
-  --repo-id 0x1111111111111111111111111111111111111111111111111111111111111111 \
+  --organization acme \
+  --repository crrp \
   --registry 0x0000000000000000000000000000000000000001 \
   --eth-rpc-http http://127.0.0.1:8545 \
   --substrate-rpc-ws ws://127.0.0.1:9944 \
@@ -94,7 +96,8 @@ cargo run -p stack-cli -- config show --repo /path/to/repo
 
 CRRP command resolution order:
 
-- Repo ID: `--repo-id` -> `.crrp/repo-id`
+- Repository slug: `--organization` + `--repository` -> `.crrp/repo-slug.json`
+- Repo ID: derived from `keccak256("organization/repository")` unless `--repo-id` override is used
 - Registry: `--registry` -> `.crrp/config.json` -> `CRRP_REGISTRY_ADDRESS` -> `deployments.json`
 - Wallet backend: `--wallet-backend` -> `.crrp/config.json` -> default `papp`
 - papp-term metadata: `--papp-term-metadata` -> `.crrp/config.json`
@@ -103,13 +106,17 @@ CRRP command resolution order:
 
 ## Shared CRRP Flags
 
-All CRRP commands (`propose`, `fetch`, `review`, `merge`, `release`, `status`, `repo`, `proposals`) share:
+All CRRP commands (`create-repo`, `propose`, `fetch`, `review`, `merge`, `release`, `status`, `repo`, `proposals`) share:
 
 - `--repo <REPO>`
   - Local Git repo path (see section above).
+- `--organization <ORG>`
+  - Repository organization override.
+- `--repository <NAME>`
+  - Repository name override.
 - `--repo-id <REPO_ID>`
-  - `0x` bytes32 override for repo id.
-  - If omitted, CLI reads `.crrp/repo-id` at repo root.
+  - `0x` bytes32 override for advanced/debug flows.
+  - If omitted, CLI derives the repo id from the repository slug.
 - `--registry <REGISTRY>`
   - Registry contract address override.
   - If omitted in RPC mode, CLI tries env/file resolution.
@@ -135,6 +142,7 @@ All CRRP commands (`propose`, `fetch`, `review`, `merge`, `release`, `status`, `
 
 Extra per-command flags:
 
+- `create-repo --initial-commit <REV> --initial-cid <CID> --signer <SIGNER> [--contributor <ADDR>] [--reviewer <ADDR>] [--skip-role-grants]`
 - `propose --commit <REV> --dry-run`
 - `merge --dry-run`
 - `release --dry-run`
@@ -144,18 +152,49 @@ Extra per-command flags:
 
 ## Command Reference
 
+### `create-repo`
+
+Create/register a repository in the on-chain CRRP registry.
+
+```bash
+cargo run -p stack-cli -- create-repo \
+  --repo /path/to/repo \
+  --organization acme \
+  --repository crrp \
+  --registry 0xYourRegistryAddress \
+  --signer alice \
+  --initial-cid mock://init \
+  --allow-non-main
+```
+
+Behavior:
+
+- resolves initial commit from `HEAD` (or `--initial-commit`)
+- derives `repoId = keccak256("organization/repository")`
+- submits `createRepo(organization, repository, initialHeadCommit, initialHeadCid)`
+- by default, also grants contributor/reviewer roles:
+  - contributor defaults to signer address (or `--contributor`)
+  - reviewer defaults to contributor (or `--reviewer`)
+- writes `.crrp/repo-slug.json` and `.crrp/repo-id`
+
+For local testing without RPC:
+
+```bash
+cargo run -p stack-cli -- create-repo --repo /path/to/repo --mock --initial-cid mock://init
+```
+
 ### `propose`
 
 Prepare/submit a proposal flow.
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo --bulletin-signer "<mnemonic-or-0x-seed>"
+cargo run -p stack-cli -- propose --repo /path/to/repo --bulletin-signer alice
 ```
 
 Use a specific commit instead of `HEAD`:
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo --commit HEAD~1 --bulletin-signer "<mnemonic-or-0x-seed>"
+cargo run -p stack-cli -- propose --repo /path/to/repo --commit HEAD~1 --bulletin-signer alice
 ```
 
 In `--mock` mode this now:
@@ -168,10 +207,21 @@ In `--mock` mode this now:
 In non-mock mode, `propose` now also:
 
 - requires `--bulletin-signer` / `CRRP_BULLETIN_SIGNER`
+- requests a pwallet SignRequest popup before broadcast (`--wallet-backend papp`)
 - checks `TransactionStorage.Authorizations` first and fails early if authorization is missing/insufficient
 - uploads the bundle bytes with a Bulletin extrinsic (`TransactionStorage.store`)
 - prints finalized extrinsic hash
 - keeps using a local CID placeholder until chain-derived CID wiring is completed
+
+Current limitation:
+
+- The Bulletin extrinsic is still signed/submitted by `--bulletin-signer` in the CLI runtime.
+- The pwallet step now captures a real wallet signature via phone approval and stores the signature artifact locally. Bulletin submission still uses `--bulletin-signer` until direct signer wiring is completed.
+
+Testing note:
+
+- For local/dev demonstrations, use `--bulletin-signer alice` (or `bob`/`charlie`).
+- For real user flows, pass a user-controlled mnemonic or `0x` secret seed instead.
 
 ### `fetch <proposal_id>`
 
@@ -254,7 +304,7 @@ CRRP commands require:
 
 - valid Git repository
 - current branch must be `main` (unless `--allow-non-main` or `.crrp/config.json` has `allowNonMain: true`)
-- repo id available via `.crrp/repo-id` or `--repo-id`
+- repository slug available via `.crrp/repo-slug.json` or `--organization` + `--repository`
 
 ## Wallet Sign-In Behavior
 
@@ -279,12 +329,19 @@ cargo run -p stack-cli -- propose --repo /path/to/repo --mock --wallet-backend m
 
 ### `papp` backend (`papp-terminal`)
 
-CRRP links to `papp-terminal` as a Rust library and opens the TUI in-process for wallet sign-in.
+CRRP links to `papp-terminal` as a Rust library for pairing protocol compatibility and uses a QR pairing flow in CLI output.
 
 Run command:
 
 ```bash
-cargo run -p stack-cli -- propose --repo /path/to/repo --wallet-backend papp
+cargo run -p stack-cli -- propose --repo /path/to/repo --wallet-backend papp --bulletin-signer alice
 ```
 
-CRRP launches `papp-term tui` for sign-in when a signature-requiring command runs.
+CRRP performs QR pairing if needed, then sends a real pwallet sign request for each signature gate.
+
+Bridge dependency setup (one-time):
+
+```bash
+cd cli/wallet-bridge
+npm install
+```
