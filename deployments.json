@@ -1,4 +1,5 @@
 {
-  "evm": null,
-  "pvm": null
+  "evm": "0xe1f95d1e04c11bbfa5d23365ce202d117d7c157a",
+  "pvm": "0x4939ac58d2e9c267fd5b784642244483228a290b",
+  "evmTreasury": "0x970951a12f975e6762482aca81e57d5a2a4e73f4"
 }

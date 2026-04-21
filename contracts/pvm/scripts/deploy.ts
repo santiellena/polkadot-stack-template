@@ -1,6 +1,16 @@
 import hre from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
+import { defineChain } from "viem";
+
+const polkadotHubTestnet = defineChain({
+	id: 420420417,
+	name: "Polkadot Hub TestNet",
+	nativeCurrency: { name: "Unit", symbol: "UNIT", decimals: 18 },
+	rpcUrls: {
+		default: { http: ["https://services.polkadothub-rpc.com/testnet"] },
+	},
+});
 
 const DEPLOYMENTS_JSON = path.resolve(__dirname, "../../../deployments.json");
 const DEPLOYMENTS_TS = path.resolve(__dirname, "../../../web/src/config/deployments.ts");
@@ -29,11 +39,11 @@ export const deployments: { evm: string | null; pvm: string | null } = {
 }
 
 async function main() {
-	console.log("Deploying ProofOfExistence (PVM/resolc)...");
+	console.log("Deploying CRRP (PVM/resolc)...");
 
-	const [walletClient] = await hre.viem.getWalletClients();
-	const publicClient = await hre.viem.getPublicClient();
-	const artifact = await hre.artifacts.readArtifact("ProofOfExistence");
+	const [walletClient] = await hre.viem.getWalletClients({ chain: polkadotHubTestnet });
+	const publicClient = await hre.viem.getPublicClient({ chain: polkadotHubTestnet });
+	const artifact = await hre.artifacts.readArtifact("CRRPRepositoryRegistry");
 
 	const hash = await walletClient.deployContract({
 		abi: artifact.abi,
