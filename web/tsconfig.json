@@ -20,5 +20,9 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/features/git",
+    "src/routes/RepoTreeRoute.tsx"
+  ]
 }

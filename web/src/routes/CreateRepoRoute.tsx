@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { isAddress, parseEther, type Address, type Hex } from "viem";
+import { encodeFunctionData, isAddress, keccak256, parseEther, type Abi, type Address, type Hex } from "viem";
 import { ZERO_ADDRESS } from "../config/crrp";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
@@ -19,6 +19,10 @@ import {
 } from "../lib/crrp";
 import { hexHashToCid } from "../utils/cid";
 import { hashFileWithBytes } from "../utils/hash";
+import { Binary, FixedSizeBinary } from "polkadot-api";
+import { stack_template } from "@polkadot-api/descriptors";
+import { getClient } from "../hooks/useChain";
+import { useChainStore } from "../store/chainStore";
 
 type AuthorizationState = "idle" | "checking" | "authorized" | "unauthorized";
 
@@ -55,6 +59,11 @@ export default function CreateRepoRoute() {
 		connectBrowserWallet: connectSubstrateWallet,
 		getBulletinSigner,
 	} = useSubstrateSession();
+	const wsUrl = useChainStore((s) => s.wsUrl);
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
+	const substrateH160: `0x${string}` | null = substrateAccount
+		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
+		: null;
 	const [organization, setOrganization] = useState("");
 	const [repository, setRepository] = useState("");
 	const [initialHeadCommit, setInitialHeadCommit] = useState("");
@@ -212,24 +221,68 @@ export default function CreateRepoRoute() {
 				await uploadToBulletin(bundleBytes!, bulletinSigner);
 			}
 
-			const walletClient = await getWalletClientForWrite();
-			if (!walletClient.account) {
-				throw new Error("No EVM signer is available for repository creation");
+			if (!account && !substrateH160) {
+				throw new Error("No EVM signer is available. Connect a wallet.");
 			}
-			const signerAccount = walletClient.account;
 
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
 
+			const execContractWrite = async (opts: {
+				address: `0x${string}`;
+				abi: Abi;
+				functionName: string;
+				args?: unknown[];
+				value?: bigint;
+			}): Promise<void> => {
+				if (account) {
+					const walletClient = await getWalletClientForWrite();
+					if (!walletClient.account) throw new Error("No EVM signer");
+					const hash = await walletClient.writeContract({
+						address: opts.address,
+						abi: opts.abi,
+						functionName: opts.functionName,
+						args: opts.args,
+						value: opts.value,
+						account: walletClient.account,
+						chain: walletClient.chain,
+					});
+					await publicClient.waitForTransactionReceipt({ hash });
+					return;
+				}
+				if (substrateAccount) {
+					const calldata = encodeFunctionData({
+						abi: opts.abi,
+						functionName: opts.functionName,
+						args: opts.args ?? [],
+					});
+					const api = getClient(wsUrl).getTypedApi(stack_template);
+					const tx = api.tx.Revive.call({
+						dest: FixedSizeBinary.fromHex(opts.address),
+						value: opts.value ?? 0n,
+						weight_limit: { ref_time: 10_000_000_000n, proof_size: 200_000n },
+						storage_deposit_limit: 0n,
+						data: Binary.fromHex(calldata),
+					});
+					await new Promise<void>((resolve, reject) => {
+						tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
+							next: (ev) => {
+								if (ev.type === "txBestBlocksState" && ev.found) resolve();
+							},
+							error: reject,
+						});
+					});
+					return;
+				}
+				throw new Error("No EVM signer available");
+			};
+
 			setStatus("Submitting createRepo transaction...");
-			const createRepoHash = await walletClient.writeContract({
+			await execContractWrite({
 				address: registryAddress,
-				abi: crrpRegistryAbi,
+				abi: crrpRegistryAbi as Abi,
 				functionName: "createRepo",
 				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, effectiveCid, permissionlessContributions],
-				account: signerAccount,
-				chain: walletClient.chain,
 			});
-			await publicClient.waitForTransactionReceipt({ hash: createRepoHash });
 
 			if (!permissionlessContributions) {
 				const validContributors = contributors
@@ -237,29 +290,23 @@ export default function CreateRepoRoute() {
 					.filter((c) => c && isAddress(c)) as Address[];
 				for (const contributorAddress of validContributors) {
 					setStatus(`Granting contributor role to ${contributorAddress}...`);
-					const contributorHash = await walletClient.writeContract({
+					await execContractWrite({
 						address: registryAddress,
-						abi: crrpRegistryAbi,
+						abi: crrpRegistryAbi as Abi,
 						functionName: "setContributorRole",
 						args: [repoId as Hex, contributorAddress, true],
-						account: signerAccount,
-						chain: walletClient.chain,
 					});
-					await publicClient.waitForTransactionReceipt({ hash: contributorHash });
 				}
 			}
 
 			if (reviewer) {
 				setStatus("Granting reviewer role...");
-				const reviewerHash = await walletClient.writeContract({
+				await execContractWrite({
 					address: registryAddress,
-					abi: crrpRegistryAbi,
+					abi: crrpRegistryAbi as Abi,
 					functionName: "setReviewerRole",
 					args: [repoId, reviewer as Address, true],
-					account: signerAccount,
-					chain: walletClient.chain,
 				});
-				await publicClient.waitForTransactionReceipt({ hash: reviewerHash });
 			}
 
 			const treasuryAddress = (await publicClient.readContract({
@@ -275,15 +322,12 @@ export default function CreateRepoRoute() {
 					throw new Error("Repository treasury is not configured on-chain");
 				}
 				setStatus("Configuring treasury payout rewards...");
-				const payoutHash = await walletClient.writeContract({
+				await execContractWrite({
 					address: treasuryAddress,
-					abi: crrpTreasuryAbi,
+					abi: crrpTreasuryAbi as Abi,
 					functionName: "setPayoutConfig",
 					args: [repoId, contributionRewardAmount, reviewRewardAmount],
-					account: signerAccount,
-					chain: walletClient.chain,
 				});
-				await publicClient.waitForTransactionReceipt({ hash: payoutHash });
 			}
 
 			if (initialDonationAmount > 0n) {
@@ -291,16 +335,13 @@ export default function CreateRepoRoute() {
 					throw new Error("Repository treasury is not configured on-chain");
 				}
 				setStatus("Funding treasury...");
-				const donationHash = await walletClient.writeContract({
+				await execContractWrite({
 					address: treasuryAddress,
-					abi: crrpTreasuryAbi,
+					abi: crrpTreasuryAbi as Abi,
 					functionName: "donate",
 					args: [repoId],
 					value: initialDonationAmount,
-					account: signerAccount,
-					chain: walletClient.chain,
 				});
-				await publicClient.waitForTransactionReceipt({ hash: donationHash });
 			}
 
 			navigate(
@@ -513,11 +554,36 @@ export default function CreateRepoRoute() {
 							an EVM signer.
 						</p>
 					</div>
-					<ValueLine label="EVM signer" value={account ? `${sourceLabel}: ${shortenAddress(account)}` : "Not connected"} />
+					<ValueLine
+						label="EVM signer"
+						value={
+							account
+								? `${sourceLabel}: ${shortenAddress(account)}`
+								: substrateH160
+									? `Substrate: ${shortenAddress(substrateH160)}`
+									: "Not connected"
+						}
+					/>
 					{canUseBrowserWallet ? (
 						<button onClick={() => void connectBrowserWallet()} className="btn-secondary w-full">
 							Connect EVM Browser Wallet
 						</button>
+					) : null}
+					{!account && browserAccounts.length === 0 && availableWallets.length > 0 ? (
+						<div>
+							<label className="label">Connect Wallet for EVM Signing</label>
+							<div className="mt-2 flex flex-wrap gap-2">
+								{availableWallets.map((walletName) => (
+									<button
+										key={walletName}
+										onClick={() => void connectSubstrateWallet(walletName)}
+										className="btn-secondary"
+									>
+										Connect {walletName}
+									</button>
+								))}
+							</div>
+						</div>
 					) : null}
 					{canUseDevSigner ? (
 						<div>

@@ -45,3 +45,5 @@ contracts/*/ignition/deployments/
 
 # CRRP
 .crrp/
+
+original-template/
