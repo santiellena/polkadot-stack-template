@@ -54,7 +54,7 @@ export function TreasuryDonationCard({
 				functionName: "donate",
 				args: [repoId],
 				value: parseEther(amount),
-				account: walletClient.account,
+				account: walletClient.account as any,
 				chain: walletClient.chain,
 			});
 

@@ -66,12 +66,12 @@ export default function RepoRoute() {
 						>
 							View History
 						</Link>
-						<Link
-							to={`/repo/${encodeURIComponent(repo.organization)}/${encodeURIComponent(repo.repository)}/tree`}
-							className="btn-secondary"
+						<span
+							className="btn-secondary cursor-not-allowed opacity-40"
+							title="Coming soon"
 						>
 							Tree
-						</Link>
+						</span>
 						<Link
 							to={`/repo/${encodeURIComponent(repo.organization)}/${encodeURIComponent(repo.repository)}/leaderboard`}
 							className="btn-secondary"
@@ -137,6 +137,8 @@ curl -L ${repo.cloneUrl} -o crrp-${repo.repoId.slice(2, 10)}.bundle
 # This creates a brand new repo from the bundle
 git clone crrp-${repo.repoId.slice(2, 10)}.bundle crrp-${repo.repoId.slice(2, 10)}
 cd crrp-${repo.repoId.slice(2, 10)}
+git branch -a
+git checkout main
 
 # OPTION 2 — Fetch into an existing repo
 

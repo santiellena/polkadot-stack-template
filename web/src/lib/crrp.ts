@@ -754,11 +754,12 @@ export async function readRepoHistory(repoId: Hex): Promise<RepoHistoryEntry[]> 
 			toBlock: "latest",
 		}),
 	]);
+	const repoIdLower = repoId.toLowerCase();
 	const createdLogs = allCreatedLogs.filter(
-		(log) => (log.args.repoId as Hex | undefined)?.toLowerCase() === repoId.toLowerCase(),
+		(log) => log.topics[1]?.toLowerCase() === repoIdLower,
 	);
 	const mergedLogs = allMergedLogs.filter(
-		(log) => (log.args.repoId as Hex | undefined)?.toLowerCase() === repoId.toLowerCase(),
+		(log) => log.topics[1]?.toLowerCase() === repoIdLower,
 	);
 
 	const initialEntries = await Promise.all(
@@ -801,14 +802,14 @@ export async function readRepoHistory(repoId: Hex): Promise<RepoHistoryEntry[]> 
 
 export async function readRepoReleases(repoId: Hex): Promise<RepoRelease[]> {
 	const client = getPublicClient(getStoredEthRpcUrl());
-	const allLogs = await client.getLogs({
+	const allReleaseLogs = await client.getLogs({
 		address: getRegistryAddress(),
 		event: releaseCreatedEvent,
 		fromBlock: 0n,
 		toBlock: "latest",
 	});
-	const logs = allLogs.filter(
-		(log) => (log.args.repoId as Hex | undefined)?.toLowerCase() === repoId.toLowerCase(),
+	const logs = allReleaseLogs.filter(
+		(log) => log.topics[1]?.toLowerCase() === repoId.toLowerCase(),
 	);
 
 	const releases = await Promise.all(

@@ -10,7 +10,7 @@ const LeaderboardRoute = lazy(() => import("./routes/LeaderboardRoute"));
 const RepoRoute = lazy(() => import("./routes/RepoRoute"));
 const RepoHistoryRoute = lazy(() => import("./routes/RepoHistoryRoute"));
 const RepoLeaderboardRoute = lazy(() => import("./routes/RepoLeaderboardRoute"));
-const RepoTreeRoute = lazy(() => import("./routes/RepoTreeRoute"));
+// const RepoTreeRoute = lazy(() => import("./routes/RepoTreeRoute"));
 const CreateProposalRoute = lazy(() => import("./routes/CreateProposalRoute"));
 const RepoProposalsRoute = lazy(() => import("./routes/RepoProposalsRoute"));
 
@@ -77,9 +77,9 @@ createRoot(document.getElementById("root")!).render(
 					<Route
 						path="repo/:organization/:repository/tree/*"
 						element={
-							<Suspense fallback={routeFallback}>
-								<RepoTreeRoute />
-							</Suspense>
+							<div className="card py-10 text-center text-sm text-text-secondary">
+								Repository browser is coming soon.
+							</div>
 						}
 					/>
 					<Route
