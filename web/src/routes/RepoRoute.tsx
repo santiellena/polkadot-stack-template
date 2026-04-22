@@ -17,13 +17,18 @@ import {
 
 export default function RepoRoute() {
 	const { organization, repository } = useParams();
-	const { account } = useWalletSession();
-	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const { account, sourceLabel } = useWalletSession();
+	const { browserAccounts, selectedBrowserAccountIndex, browserSourceLabel } = useSubstrateSession();
 	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
 	const substrateH160 = substrateAccount
 		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
 		: null;
-	const effectiveAccount = account ?? substrateH160;
+	const effectiveAccount = substrateH160 ?? account;
+	const signedInLabel = substrateAccount
+		? `${(browserSourceLabel ?? substrateAccount.name) || "Polkadot wallet"}: ${substrateAccount.address}`
+		: account
+			? `${sourceLabel}: ${account}`
+			: "Using local dev fallback";
 	const { repo, loading, error, refresh } = useRepoOverview(organization, repository, effectiveAccount);
 	const { entries: leaderboardEntries, loading: leaderboardLoading } = useRepoLeaderboard(
 		repo?.repoId,
@@ -194,7 +199,7 @@ git merge bundle-main`}
 					<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
 						<div>Signed-in account</div>
 						<div className="mt-1 font-mono break-all text-text-primary">
-							{account || "Using local dev fallback"}
+							{signedInLabel}
 						</div>
 					</div>
 				</div>
@@ -291,6 +296,8 @@ git merge bundle-main`}
 				reviewReward={repo.reviewReward}
 				totalClaimable={repo.totalClaimable}
 				unfundedClaimable={repo.unfundedClaimable}
+				userClaimable={repo.userClaimable}
+				canClaimRewards={repo.roles.isContributor || repo.roles.isReviewer}
 				onDonated={refresh}
 			/>
 		</div>

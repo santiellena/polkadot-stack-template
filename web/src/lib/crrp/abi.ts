@@ -231,6 +231,13 @@ export const crrpTreasuryAbi = [
 	},
 	{
 		type: "function",
+		name: "claim",
+		inputs: [{ name: "repoId", type: "bytes32" }],
+		outputs: [],
+		stateMutability: "nonpayable",
+	},
+	{
+		type: "function",
 		name: "getRepoBalance",
 		inputs: [{ name: "repoId", type: "bytes32" }],
 		outputs: [{ name: "", type: "uint256" }],
@@ -255,6 +262,16 @@ export const crrpTreasuryAbi = [
 			{ name: "contributionReward", type: "uint256" },
 			{ name: "reviewReward", type: "uint256" },
 		],
+		stateMutability: "view",
+	},
+	{
+		type: "function",
+		name: "getClaimable",
+		inputs: [
+			{ name: "repoId", type: "bytes32" },
+			{ name: "who", type: "address" },
+		],
+		outputs: [{ name: "", type: "uint256" }],
 		stateMutability: "view",
 	},
 	{

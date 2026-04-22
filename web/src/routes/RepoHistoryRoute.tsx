@@ -1,4 +1,6 @@
 import { Link, useParams } from "react-router-dom";
+import { keccak256 } from "viem";
+import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
 import { formatGitCommitHash, formatRepoTimestamp, shortenAddress, shortenHash } from "../lib/crrp";
@@ -6,7 +8,13 @@ import { formatGitCommitHash, formatRepoTimestamp, shortenAddress, shortenHash }
 export default function RepoHistoryRoute() {
 	const { organization, repository } = useParams();
 	const { account } = useWalletSession();
-	const { repo, loading, error } = useRepoOverview(organization, repository, account);
+	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
+	const substrateH160 = substrateAccount
+		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
+		: null;
+	const effectiveAccount = substrateH160 ?? account;
+	const { repo, loading, error } = useRepoOverview(organization, repository, effectiveAccount);
 
 	if (loading) {
 		return <div className="card animate-pulse h-40" />;

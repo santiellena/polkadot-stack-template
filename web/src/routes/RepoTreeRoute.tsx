@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { keccak256 } from "viem";
+import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { type FileEntry, isBinaryPath, useGitBundle } from "../features/git/useGitBundle";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
@@ -8,11 +10,17 @@ import { buildBundleUrl, formatGitCommitHash } from "../lib/crrp";
 export default function RepoTreeRoute() {
 	const { organization, repository } = useParams();
 	const { account } = useWalletSession();
+	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
+	const substrateH160 = substrateAccount
+		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
+		: null;
+	const effectiveAccount = substrateH160 ?? account;
 	const {
 		repo,
 		loading: repoLoading,
 		error: repoError,
-	} = useRepoOverview(organization, repository, account);
+	} = useRepoOverview(organization, repository, effectiveAccount);
 
 	const bundleUrl = buildBundleUrl(repo?.latestCid ?? "");
 	const gitState = useGitBundle(bundleUrl);

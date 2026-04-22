@@ -79,6 +79,7 @@ export type RepoOverview = {
 	reviewReward: bigint | null;
 	totalClaimable: bigint | null;
 	unfundedClaimable: bigint | null;
+	userClaimable: bigint | null;
 	commitList: RepoHistoryEntry[];
 	releases: RepoRelease[];
 	cloneUrl: string | null;

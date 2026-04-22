@@ -1,16 +1,24 @@
 import { Link, useParams } from "react-router-dom";
+import { keccak256 } from "viem";
 import { LeaderboardSummaryCards, LeaderboardTable } from "../features/leaderboard/LeaderboardTable";
 import { useRepoLeaderboard } from "../features/leaderboard/useLeaderboards";
+import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
 
 export default function RepoLeaderboardRoute() {
 	const { organization, repository } = useParams();
 	const { account } = useWalletSession();
+	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
+	const substrateH160 = substrateAccount
+		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
+		: null;
+	const effectiveAccount = substrateH160 ?? account;
 	const { repo, loading: repoLoading, error: repoError } = useRepoOverview(
 		organization,
 		repository,
-		account,
+		effectiveAccount,
 	);
 	const {
 		entries,

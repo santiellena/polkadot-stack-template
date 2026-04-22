@@ -508,6 +508,14 @@ export async function readRepoOverview(
 					functionName: "getRepoUnfundedClaimable",
 					args: [repoId],
 				}) as Promise<bigint>,
+				account
+					? (client.readContract({
+							address: treasuryAddress,
+							abi: crrpTreasuryAbi,
+							functionName: "getClaimable",
+							args: [repoId, account],
+						}) as Promise<bigint>)
+					: Promise.resolve(0n),
 			])
 		: null;
 
@@ -529,6 +537,7 @@ export async function readRepoOverview(
 		reviewReward: treasuryData?.[1]?.[1] ?? 0n,
 		totalClaimable: treasuryData?.[2] ?? 0n,
 		unfundedClaimable: treasuryData?.[3] ?? 0n,
+		userClaimable: treasuryData?.[4] ?? 0n,
 		commitList: history,
 		releases,
 		cloneUrl: buildBundleUrl(repo[2]),

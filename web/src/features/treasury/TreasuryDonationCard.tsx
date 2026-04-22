@@ -19,6 +19,8 @@ export function TreasuryDonationCard({
 	reviewReward,
 	totalClaimable,
 	unfundedClaimable,
+	userClaimable,
+	canClaimRewards,
 	onDonated,
 }: {
 	repoId: Hex;
@@ -28,6 +30,8 @@ export function TreasuryDonationCard({
 	reviewReward: bigint | null;
 	totalClaimable: bigint | null;
 	unfundedClaimable: bigint | null;
+	userClaimable: bigint | null;
+	canClaimRewards: boolean;
 	onDonated: () => Promise<void> | void;
 }) {
 	const {
@@ -56,6 +60,61 @@ export function TreasuryDonationCard({
 	const [submitting, setSubmitting] = useState(false);
 
 	const treasuryReady = Boolean(treasuryAddress) && Boolean(account || substrateH160);
+	const claimReady =
+		Boolean(treasuryAddress) && Boolean(account || substrateAccount) && Boolean(userClaimable && userClaimable > 0n);
+
+	const execTreasuryWrite = async (opts: {
+		functionName: "donate" | "claim";
+		args: [Hex];
+		value?: bigint;
+	}) => {
+		if (!treasuryAddress) {
+			throw new Error("Treasury not configured");
+		}
+
+		if (account) {
+			const walletClient = await getWalletClientForWrite();
+			const hash = await walletClient.writeContract({
+				address: treasuryAddress,
+				abi: crrpTreasuryAbi,
+				functionName: opts.functionName,
+				args: opts.args,
+				value: opts.value,
+				account: walletClient.account as unknown as Address,
+				chain: walletClient.chain,
+			});
+			const publicClient = getPublicClient(getStoredEthRpcUrl());
+			await publicClient.waitForTransactionReceipt({ hash });
+			return hash;
+		}
+
+		if (substrateAccount) {
+			const calldata = encodeFunctionData({
+				abi: crrpTreasuryAbi as Abi,
+				functionName: opts.functionName,
+				args: opts.args,
+			});
+			const api = getClient(wsUrl).getTypedApi(stack_template);
+			const tx = api.tx.Revive.call({
+				dest: FixedSizeBinary.fromHex(treasuryAddress),
+				value: opts.value ?? 0n,
+				weight_limit: { ref_time: 500_000_000_000n, proof_size: 5_000_000n },
+				storage_deposit_limit: 10_000_000_000_000n,
+				data: Binary.fromHex(calldata),
+			});
+			await new Promise<void>((resolve, reject) => {
+				tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
+					next: (ev) => {
+						if (ev.type === "txBestBlocksState" && ev.found) resolve();
+					},
+					error: reject,
+				});
+			});
+			return null;
+		}
+
+		throw new Error("No transaction signer is available");
+	};
 
 	const submitDonation = async () => {
 		if (!treasuryAddress) return;
@@ -64,51 +123,35 @@ export function TreasuryDonationCard({
 		setStatus(null);
 		try {
 			const value = parseEther(amount);
-
-			if (account) {
-				const walletClient = await getWalletClientForWrite();
-				const hash = await walletClient.writeContract({
-					address: treasuryAddress,
-					abi: crrpTreasuryAbi,
-					functionName: "donate",
-					args: [repoId],
-					value,
-					account: walletClient.account as unknown as Address,
-					chain: walletClient.chain,
-				});
-				const publicClient = getPublicClient(getStoredEthRpcUrl());
-				await publicClient.waitForTransactionReceipt({ hash });
-				setStatus(`Donation submitted: ${hash}`);
-			} else if (substrateAccount) {
-				const calldata = encodeFunctionData({
-					abi: crrpTreasuryAbi as Abi,
-					functionName: "donate",
-					args: [repoId],
-				});
-				const api = getClient(wsUrl).getTypedApi(stack_template);
-				const tx = api.tx.Revive.call({
-					dest: FixedSizeBinary.fromHex(treasuryAddress),
-					value,
-					weight_limit: { ref_time: 500_000_000_000n, proof_size: 5_000_000n },
-					storage_deposit_limit: 10_000_000_000_000n,
-					data: Binary.fromHex(calldata),
-				});
-				await new Promise<void>((resolve, reject) => {
-					tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
-						next: (ev) => {
-							if (ev.type === "txBestBlocksState" && ev.found) resolve();
-						},
-						error: reject,
-					});
-				});
-				setStatus("Donation submitted.");
-			} else {
-				throw new Error("No EVM signer available. Connect a wallet.");
-			}
+			const hash = await execTreasuryWrite({
+				functionName: "donate",
+				args: [repoId],
+				value,
+			});
+			setStatus(hash ? `Donation submitted: ${hash}` : "Donation submitted.");
 
 			await onDonated();
 		} catch (cause) {
 			setStatus(cause instanceof Error ? cause.message : "Donation failed");
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	const submitClaim = async () => {
+		if (!treasuryAddress) return;
+
+		setSubmitting(true);
+		setStatus(null);
+		try {
+			const hash = await execTreasuryWrite({
+				functionName: "claim",
+				args: [repoId],
+			});
+			setStatus(hash ? `Claim submitted: ${hash}` : "Claim submitted.");
+			await onDonated();
+		} catch (cause) {
+			setStatus(cause instanceof Error ? cause.message : "Claim failed");
 		} finally {
 			setSubmitting(false);
 		}
@@ -141,6 +184,7 @@ export function TreasuryDonationCard({
 			<div className="grid gap-3 md:grid-cols-2">
 				<ValueBlock label="Balance" value={formatEthAmount(balance)} />
 				<ValueBlock label="Total Claimable" value={formatEthAmount(totalClaimable)} />
+				<ValueBlock label="Your Claimable" value={formatEthAmount(userClaimable)} />
 				<ValueBlock label="Contributor Reward" value={formatEthAmount(contributionReward)} />
 				<ValueBlock label="Reviewer Reward" value={formatEthAmount(reviewReward)} />
 				<ValueBlock label="Unfunded Claimable" value={formatEthAmount(unfundedClaimable)} />
@@ -180,6 +224,14 @@ export function TreasuryDonationCard({
 				</div>
 			) : null}
 
+			{canClaimRewards ? (
+				<div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-text-secondary">
+					Claiming uses the treasury contract's single per-repository balance for your
+					address, so if you earned both contributor and reviewer rewards they will be
+					claimed together in one transaction.
+				</div>
+			) : null}
+
 			<div className="flex flex-col gap-3 md:flex-row md:items-end">
 				<div className="flex-1">
 					<label className="label">Donation Amount</label>
@@ -197,6 +249,13 @@ export function TreasuryDonationCard({
 					className="btn-primary md:min-w-44"
 				>
 					{submitting ? "Submitting..." : "Donate"}
+				</button>
+				<button
+					onClick={() => void submitClaim()}
+					disabled={!claimReady || submitting || !canClaimRewards}
+					className="btn-secondary md:min-w-44 disabled:opacity-50"
+				>
+					{submitting ? "Submitting..." : `Claim ${formatEthAmount(userClaimable)}`}
 				</button>
 			</div>
 

@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { isAddress, type Address, type Hex } from "viem";
+import { stack_template } from "@polkadot-api/descriptors";
+import { Binary, FixedSizeBinary } from "polkadot-api";
+import { encodeFunctionData, isAddress, type Abi, type Address, type Hex } from "viem";
 import { getPublicClient } from "../../config/evm";
 import { getStoredEthRpcUrl } from "../../config/network";
+import { getClient } from "../../hooks/useChain";
 import { useWalletSession } from "../auth/useWalletSession";
+import { useSubstrateSession } from "../auth/useSubstrateSession";
+import { useChainStore } from "../../store/chainStore";
 import { crrpRegistryAbi, getRegistryAddress, shortenAddress } from "../../lib/crrp";
 
 type RoleFunction = "setReviewerRole" | "setContributorRole";
@@ -16,7 +21,10 @@ export function MaintainerPanel({
 	permissionlessContributions: boolean;
 	onUpdated: () => void;
 }) {
-	const { getWalletClientForWrite } = useWalletSession();
+	const { account, getWalletClientForWrite } = useWalletSession();
+	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const wsUrl = useChainStore((s) => s.wsUrl);
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
 
 	const [reviewerInput, setReviewerInput] = useState("");
 	const [contributorInput, setContributorInput] = useState("");
@@ -34,19 +42,47 @@ export function MaintainerPanel({
 		setStatus(enabled ? "Granting role..." : "Revoking role...");
 
 		try {
-			const walletClient = await getWalletClientForWrite();
-			if (!walletClient.account) throw new Error("No EVM signer available");
-
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
-			const hash = await walletClient.writeContract({
-				address: getRegistryAddress(),
-				abi: crrpRegistryAbi,
-				functionName: fn,
-				args: [repoId, address as Address, enabled],
-				account: walletClient.account,
-				chain: walletClient.chain,
-			});
-			await publicClient.waitForTransactionReceipt({ hash });
+			const registryAddress = getRegistryAddress();
+
+			if (account) {
+				const walletClient = await getWalletClientForWrite();
+				if (!walletClient.account) throw new Error("No EVM signer available");
+
+				const hash = await walletClient.writeContract({
+					address: registryAddress,
+					abi: crrpRegistryAbi,
+					functionName: fn,
+					args: [repoId, address as Address, enabled],
+					account: walletClient.account,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash });
+			} else if (substrateAccount) {
+				const calldata = encodeFunctionData({
+					abi: crrpRegistryAbi as Abi,
+					functionName: fn,
+					args: [repoId, address as Address, enabled],
+				});
+				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const tx = api.tx.Revive.call({
+					dest: FixedSizeBinary.fromHex(registryAddress),
+					value: 0n,
+					weight_limit: { ref_time: 500_000_000_000n, proof_size: 5_000_000n },
+					storage_deposit_limit: 10_000_000_000_000n,
+					data: Binary.fromHex(calldata),
+				});
+				await new Promise<void>((resolve, reject) => {
+					tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
+						next: (ev) => {
+							if (ev.type === "txBestBlocksState" && ev.found) resolve();
+						},
+						error: reject,
+					});
+				});
+			} else {
+				throw new Error("No transaction signer is available");
+			}
 
 			const roleLabel = fn === "setReviewerRole" ? "Reviewer" : "Contributor";
 			setStatus(

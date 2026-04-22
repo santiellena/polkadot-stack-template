@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { type Hex } from "viem";
+import { stack_template } from "@polkadot-api/descriptors";
+import { Binary, FixedSizeBinary } from "polkadot-api";
+import { encodeFunctionData, type Abi, type Hex } from "viem";
 import { getPublicClient } from "../../config/evm";
 import { getStoredEthRpcUrl } from "../../config/network";
 import { useSubstrateSession } from "../auth/useSubstrateSession";
 import { useWalletSession } from "../auth/useWalletSession";
 import { checkBulletinAuthorization, uploadToBulletin } from "../../hooks/useBulletin";
+import { getClient } from "../../hooks/useChain";
 import {
 	buildBundleUrl,
 	crrpRegistryAbi,
@@ -13,6 +16,7 @@ import {
 	gitCommitHashToBytes32,
 	shortenAddress,
 } from "../../lib/crrp";
+import { useChainStore } from "../../store/chainStore";
 import { hexHashToCid } from "../../utils/cid";
 import { hashFileWithBytes } from "../../utils/hash";
 
@@ -33,7 +37,7 @@ export function MergePanel({
 	canMerge: boolean;
 	onMerged: () => void;
 }) {
-	const { getWalletClientForWrite } = useWalletSession();
+	const { account, getWalletClientForWrite } = useWalletSession();
 	const {
 		selectedSource: substrateSource,
 		setSelectedSource: setSubstrateSource,
@@ -50,6 +54,8 @@ export function MergePanel({
 		connectBrowserWallet: connectSubstrateWallet,
 		getBulletinSigner,
 	} = useSubstrateSession();
+	const wsUrl = useChainStore((s) => s.wsUrl);
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
 
 	const [open, setOpen] = useState(false);
 	const [finalCommit, setFinalCommit] = useState("");
@@ -168,20 +174,46 @@ export function MergePanel({
 				await uploadToBulletin(bundleBytes!, bulletinSigner);
 			}
 
-			const walletClient = await getWalletClientForWrite();
-			if (!walletClient.account) throw new Error("No EVM signer available");
-
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
 			setStatus("Submitting merge transaction...");
-			const txHash = await walletClient.writeContract({
-				address: registryAddress,
-				abi: crrpRegistryAbi,
-				functionName: "mergeProposal",
-				args: [repoId, BigInt(proposalId), finalCommitBytes32, effectiveCid],
-				account: walletClient.account,
-				chain: walletClient.chain,
-			});
-			await publicClient.waitForTransactionReceipt({ hash: txHash });
+			if (account) {
+				const walletClient = await getWalletClientForWrite();
+				if (!walletClient.account) throw new Error("No EVM signer available");
+
+				const txHash = await walletClient.writeContract({
+					address: registryAddress,
+					abi: crrpRegistryAbi,
+					functionName: "mergeProposal",
+					args: [repoId, BigInt(proposalId), finalCommitBytes32, effectiveCid],
+					account: walletClient.account,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash: txHash });
+			} else if (substrateAccount) {
+				const calldata = encodeFunctionData({
+					abi: crrpRegistryAbi as Abi,
+					functionName: "mergeProposal",
+					args: [repoId, BigInt(proposalId), finalCommitBytes32, effectiveCid],
+				});
+				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const tx = api.tx.Revive.call({
+					dest: FixedSizeBinary.fromHex(registryAddress),
+					value: 0n,
+					weight_limit: { ref_time: 500_000_000_000n, proof_size: 5_000_000n },
+					storage_deposit_limit: 10_000_000_000_000n,
+					data: Binary.fromHex(calldata),
+				});
+				await new Promise<void>((resolve, reject) => {
+					tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
+						next: (ev) => {
+							if (ev.type === "txBestBlocksState" && ev.found) resolve();
+						},
+						error: reject,
+					});
+				});
+			} else {
+				throw new Error("No transaction signer is available");
+			}
 
 			setStatus("Merged.");
 			onMerged();

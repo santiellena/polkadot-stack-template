@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { stack_template } from "@polkadot-api/descriptors";
+import { Binary, FixedSizeBinary } from "polkadot-api";
+import { encodeFunctionData, keccak256, type Abi } from "viem";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
+import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { MergePanel } from "../features/maintainer/MergePanel";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
+import { getClient } from "../hooks/useChain";
 import {
 	buildBundleUrl,
 	crrpRegistryAbi,
@@ -15,6 +20,7 @@ import {
 	shortenAddress,
 	type RepoProposal,
 } from "../lib/crrp";
+import { useChainStore } from "../store/chainStore";
 
 type ReviewReadResult = readonly [boolean, boolean];
 type ProposalEntry = RepoProposal & { reviewerVote: { exists: boolean; approved: boolean } | null };
@@ -29,10 +35,17 @@ const STATUS_CLASS: Record<number, string> = {
 export default function RepoProposalsRoute() {
 	const { organization: rawOrg, repository: rawRepo } = useParams();
 	const { account, getWalletClientForWrite } = useWalletSession();
+	const { browserAccounts, selectedBrowserAccountIndex } = useSubstrateSession();
+	const wsUrl = useChainStore((s) => s.wsUrl);
+	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
+	const substrateH160 = substrateAccount
+		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
+		: null;
+	const effectiveAccount = substrateH160 ?? account;
 	const { repo, loading: repoLoading, refresh: refreshRepo } = useRepoOverview(
 		rawOrg,
 		rawRepo,
-		account,
+		effectiveAccount,
 	);
 
 	const [proposals, setProposals] = useState<ProposalEntry[]>([]);
@@ -68,14 +81,14 @@ export default function RepoProposalsRoute() {
 
 			const [proposalResults, reviewResults] = await Promise.all([
 				readRepoProposals(repo.repoId),
-				account && repo.roles.isReviewer
+				effectiveAccount && repo.roles.isReviewer
 					? Promise.all(
 							ids.map((i) =>
 								client.readContract({
 									address: registryAddress,
 									abi: crrpRegistryAbi,
 									functionName: "getReview",
-									args: [repo.repoId, BigInt(i), account],
+									args: [repo.repoId, BigInt(i), effectiveAccount],
 								}) as Promise<ReviewReadResult>,
 							),
 						)
@@ -102,7 +115,7 @@ export default function RepoProposalsRoute() {
 		return () => {
 			cancelled = true;
 		};
-	}, [repo, account, refreshKey]);
+	}, [effectiveAccount, refreshKey, repo]);
 
 	const submitReview = async (proposalId: number, approved: boolean) => {
 		if (!repo) return;
@@ -114,19 +127,47 @@ export default function RepoProposalsRoute() {
 		}));
 
 		try {
-			const walletClient = await getWalletClientForWrite();
-			if (!walletClient.account) throw new Error("No EVM signer available");
-
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
-			const hash = await walletClient.writeContract({
-				address: getRegistryAddress(),
-				abi: crrpRegistryAbi,
-				functionName: "reviewProposal",
-				args: [repo.repoId, BigInt(proposalId), approved],
-				account: walletClient.account,
-				chain: walletClient.chain,
-			});
-			await publicClient.waitForTransactionReceipt({ hash });
+			const registryAddress = getRegistryAddress();
+
+			if (account) {
+				const walletClient = await getWalletClientForWrite();
+				if (!walletClient.account) throw new Error("No EVM signer available");
+
+				const hash = await walletClient.writeContract({
+					address: registryAddress,
+					abi: crrpRegistryAbi,
+					functionName: "reviewProposal",
+					args: [repo.repoId, BigInt(proposalId), approved],
+					account: walletClient.account,
+					chain: walletClient.chain,
+				});
+				await publicClient.waitForTransactionReceipt({ hash });
+			} else if (substrateAccount) {
+				const calldata = encodeFunctionData({
+					abi: crrpRegistryAbi as Abi,
+					functionName: "reviewProposal",
+					args: [repo.repoId, BigInt(proposalId), approved],
+				});
+				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const tx = api.tx.Revive.call({
+					dest: FixedSizeBinary.fromHex(registryAddress),
+					value: 0n,
+					weight_limit: { ref_time: 500_000_000_000n, proof_size: 5_000_000n },
+					storage_deposit_limit: 10_000_000_000_000n,
+					data: Binary.fromHex(calldata),
+				});
+				await new Promise<void>((resolve, reject) => {
+					tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
+						next: (ev) => {
+							if (ev.type === "txBestBlocksState" && ev.found) resolve();
+						},
+						error: reject,
+					});
+				});
+			} else {
+				throw new Error("No transaction signer is available");
+			}
 
 			setTxStatus((prev) => ({
 				...prev,
@@ -221,7 +262,7 @@ export default function RepoProposalsRoute() {
 				<div className="space-y-3">
 					{proposals.map((proposal) => {
 						const isOwnProposal =
-							account?.toLowerCase() === proposal.contributor.toLowerCase();
+							effectiveAccount?.toLowerCase() === proposal.contributor.toLowerCase();
 						const canReview =
 							repo.roles.isReviewer &&
 							//!repo.roles.isMaintainer &&
