@@ -1,5 +1,6 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-viem";
+import "@parity/hardhat-polkadot";
 import { vars } from "hardhat/config";
 import { defineChain } from "viem";
 
@@ -31,21 +32,6 @@ const config: HardhatUserConfig = {
 			chainId: 420420417,
 			accounts: [process.env.PRIVATE_KEY ?? vars.get("PRIVATE_KEY", "")].filter(Boolean),
 		},
-	},
-	etherscan: {
-		apiKey: {
-			polkadotTestnet: "no-api-key-needed",
-		},
-		customChains: [
-			{
-				network: "polkadotTestnet",
-				chainId: 420420417,
-				urls: {
-					apiURL: "https://blockscout-testnet.polkadot.io/api",
-					browserURL: "https://blockscout-testnet.polkadot.io/",
-				},
-			},
-		],
 	},
 };
 
