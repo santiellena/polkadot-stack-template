@@ -74,15 +74,25 @@ export function TreasuryDonationCard({
 
 		if (account) {
 			const walletClient = await getWalletClientForWrite();
-			const hash = await walletClient.writeContract({
-				address: treasuryAddress,
-				abi: aperioTreasuryAbi,
-				functionName: opts.functionName,
-				args: opts.args,
-				value: opts.value,
-				account: walletClient.account as unknown as Address,
-				chain: walletClient.chain,
-			});
+			const hash =
+				opts.functionName === "donate"
+					? await walletClient.writeContract({
+						address: treasuryAddress,
+						abi: aperioTreasuryAbi,
+						functionName: "donate",
+						args: opts.args,
+						value: opts.value ?? 0n,
+						account: walletClient.account as unknown as Address,
+						chain: walletClient.chain,
+					})
+					: await walletClient.writeContract({
+						address: treasuryAddress,
+						abi: aperioTreasuryAbi,
+						functionName: "claim",
+						args: opts.args,
+						account: walletClient.account as unknown as Address,
+						chain: walletClient.chain,
+					});
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
 			await publicClient.waitForTransactionReceipt({ hash });
 			return hash;

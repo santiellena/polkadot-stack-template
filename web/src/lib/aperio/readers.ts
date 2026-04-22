@@ -230,6 +230,8 @@ async function getRepoCatalogItem(
 		headCid: repo[2],
 		createdAt: Number(timestamps[0]) || null,
 		blockNumber: timestamps[1],
+		treasuryBalance: 0n,
+		totalEarned: 0n,
 	};
 	repoCatalog.set(repoId.toLowerCase(), item);
 	return item;

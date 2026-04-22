@@ -43,7 +43,4 @@ contracts/*/ignition/deployments/
 
 .codex
 
-# CRRP
-.crrp/
-
 original-template/
