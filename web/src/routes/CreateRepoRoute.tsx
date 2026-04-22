@@ -157,7 +157,7 @@ export default function CreateRepoRoute() {
 			setStatus(null);
 
 			if (!registryAddress) {
-				throw new Error("CRRP registry address is not configured");
+				throw new Error("Aperio registry address is not configured");
 			}
 			if (!repoSlugValid) {
 				throw new Error("Organization and repository are required");
@@ -352,7 +352,7 @@ export default function CreateRepoRoute() {
 					<div>
 						<h1 className="page-title">Create Repository</h1>
 						<p className="mt-2 max-w-3xl text-text-secondary">
-							Create a CRRP repository from the web by uploading the canonical Git bundle,
+							Create an Aperio repository from the web by uploading the canonical Git bundle,
 							deriving its CID, and submitting the initial `HEAD` to the registry.
 						</p>
 					</div>

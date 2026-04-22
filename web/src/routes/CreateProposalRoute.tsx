@@ -136,7 +136,7 @@ export default function CreateProposalRoute() {
 			setStatus(null);
 
 			if (!registryAddress) {
-				throw new Error("CRRP registry address is not configured");
+				throw new Error("Aperio registry address is not configured");
 			}
 			if (!repoId) {
 				throw new Error("Invalid repository path");

@@ -7,7 +7,7 @@ export { BUNDLE_GATEWAY_BASE };
 
 export function getRegistryAddress(): Address {
 	if (!DEFAULT_REGISTRY_ADDRESS) {
-		throw new Error("CRRP registry address is not configured");
+		throw new Error("Aperio registry address is not configured");
 	}
 	return DEFAULT_REGISTRY_ADDRESS as Address;
 }

@@ -252,17 +252,17 @@ export default function RepoRoute() {
 							</div>
 							<CommandBlock
 								command={`# Download the latest canonical bundle
-curl -L ${repo.cloneUrl} -o crrp-${repo.repoId.slice(2, 10)}.bundle
+curl -L ${repo.cloneUrl} -o aperio-${repo.repoId.slice(2, 10)}.bundle
 
 # Clone into a fresh repository
-git clone crrp-${repo.repoId.slice(2, 10)}.bundle crrp-${repo.repoId.slice(2, 10)}
-cd crrp-${repo.repoId.slice(2, 10)}
+git clone aperio-${repo.repoId.slice(2, 10)}.bundle aperio-${repo.repoId.slice(2, 10)}
+cd aperio-${repo.repoId.slice(2, 10)}
 git checkout main
 
 # Or fetch into an existing clone
 cd /path/to/your/existing-repo
-git bundle list-heads ../crrp-${repo.repoId.slice(2, 10)}.bundle
-git fetch ../crrp-${repo.repoId.slice(2, 10)}.bundle main:bundle-main
+git bundle list-heads ../aperio-${repo.repoId.slice(2, 10)}.bundle
+git fetch ../aperio-${repo.repoId.slice(2, 10)}.bundle main:bundle-main
 git log bundle-main --oneline`}
 							/>
 						</>

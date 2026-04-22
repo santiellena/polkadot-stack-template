@@ -27,12 +27,12 @@ export default function App() {
 					<Link to="/" className="flex shrink-0 items-center gap-3">
 							<img
 								src={crrpLogo}
-								alt="CRRP logo"
+								alt="Aperio logo"
 								className="h-10 w-10 rounded-lg object-cover"
 							/>
 							<div className="min-w-0">
 								<div className="text-base font-semibold text-white tracking-tight">
-									CRRP
+									Aperio
 								</div>
 								<div className="truncate text-xs text-text-tertiary">
 									Canonical repository state, proposals, bundles
