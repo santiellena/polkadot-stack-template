@@ -42,7 +42,7 @@ export default function HomeRoute() {
 						<div>
 							<h1 className="page-title">Read canonical repository state, not just project metadata.</h1>
 							<p className="mt-3 max-w-3xl leading-relaxed text-text-secondary">
-								CRRP is a repository registry. Git manages history off-chain, Bulletin stores
+								Aperio is a repository registry. Git manages history off-chain, Bulletin stores
 								bundles, and the contract records which commit is canonical. The web app
 								should foreground that sequence.
 							</p>

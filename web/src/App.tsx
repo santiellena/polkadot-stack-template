@@ -31,7 +31,10 @@ export default function App() {
 								className="h-10 w-10 rounded-lg object-cover"
 							/>
 							<div className="min-w-0">
-								<div className="text-base font-semibold text-white tracking-tight">
+								<div
+									className="text-base font-semibold text-white tracking-tight"
+									title="From Latin, aperio: to open, uncover, reveal, to make accessible"
+								>
 									Aperio
 								</div>
 								<div className="truncate text-xs text-text-tertiary">
