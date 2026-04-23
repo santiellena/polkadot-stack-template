@@ -3,12 +3,12 @@ name: CI — EVM Contracts
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
       - "contracts/evm/**"
       - ".github/workflows/ci-evm.yml"
   pull_request:
-    branches: [main, master]
+    branches: [main]
     paths:
       - "contracts/evm/**"
       - ".github/workflows/ci-evm.yml"

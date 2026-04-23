@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { encodeFunctionData, keccak256, parseEther, parseUnits, type Abi } from "viem";
 import { Binary, FixedSizeBinary } from "polkadot-api";
-import { stack_template } from "@polkadot-api/descriptors";
+import { asset_hub_paseo } from "@polkadot-api/descriptors";
 import { aperioTreasuryAbi, formatEthAmount, shortenAddress } from "../../lib/aperio";
 import { useWalletSession } from "../auth/useWalletSession";
 import { useSubstrateSession } from "../auth/useSubstrateSession";
@@ -83,7 +83,7 @@ export function TreasuryDonationCard({
 		if (!substrateAccount || value <= 0n) {
 			return null;
 		}
-		const api = getClient(wsUrl).getTypedApi(stack_template);
+		const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 		const accountInfo = await api.query.System.Account.getValue(substrateAccount.address);
 		if (accountInfo.data.free < value) {
 			throw new Error(
@@ -166,7 +166,7 @@ export function TreasuryDonationCard({
 				functionName: opts.functionName,
 				args: opts.args,
 			});
-			const api = getClient(wsUrl).getTypedApi(stack_template);
+			const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 			const tx = api.tx.Revive.call({
 				dest: FixedSizeBinary.fromHex(treasuryAddress),
 				value: opts.value ?? 0n,
@@ -288,7 +288,7 @@ export function TreasuryDonationCard({
 		let freeBalance: bigint | null = null;
 		try {
 			if (substrateAccount) {
-				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 				freeBalance = (await api.query.System.Account.getValue(substrateAccount.address))
 					.data.free;
 			}

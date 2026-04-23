@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { stack_template } from "@polkadot-api/descriptors";
+import { asset_hub_paseo } from "@polkadot-api/descriptors";
 import { Binary, FixedSizeBinary } from "polkadot-api";
 import { encodeFunctionData, keccak256, type Abi } from "viem";
 import { getPublicClient } from "../config/evm";
@@ -150,7 +150,7 @@ export default function RepoProposalsRoute() {
 					functionName: "reviewProposal",
 					args: [repo.repoId, BigInt(proposalId), approved],
 				});
-				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 				const tx = api.tx.Revive.call({
 					dest: FixedSizeBinary.fromHex(registryAddress),
 					value: 0n,

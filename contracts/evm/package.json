@@ -1,7 +1,7 @@
 {
-  "name": "evm-ccrp",
+  "name": "aperio-evm",
   "version": "0.1.0",
-  "description": "EVM deployment of the Censorship-Resistant Repositories Protocol contract using Hardhat + solc + viem",
+  "description": "EVM deployment of the Aperio repository registry using Hardhat, solc, and viem",
   "engines": {
     "node": ">=22 <23",
     "npm": ">=10"

@@ -2,48 +2,6 @@ import { createPublicClient, createWalletClient, http, defineChain, type Chain }
 import { privateKeyToAccount } from "viem/accounts";
 import { getStoredEthRpcUrl } from "./network";
 
-// ProofOfExistence contract ABI — same for both EVM (solc) and PVM (resolc) deployments
-export const proofOfExistenceAbi = [
-	{
-		type: "function",
-		name: "createClaim",
-		inputs: [{ name: "documentHash", type: "bytes32" }],
-		outputs: [],
-		stateMutability: "nonpayable",
-	},
-	{
-		type: "function",
-		name: "revokeClaim",
-		inputs: [{ name: "documentHash", type: "bytes32" }],
-		outputs: [],
-		stateMutability: "nonpayable",
-	},
-	{
-		type: "function",
-		name: "getClaim",
-		inputs: [{ name: "documentHash", type: "bytes32" }],
-		outputs: [
-			{ name: "owner", type: "address" },
-			{ name: "blockNumber", type: "uint256" },
-		],
-		stateMutability: "view",
-	},
-	{
-		type: "function",
-		name: "getClaimCount",
-		inputs: [],
-		outputs: [{ name: "", type: "uint256" }],
-		stateMutability: "view",
-	},
-	{
-		type: "function",
-		name: "getClaimHashAtIndex",
-		inputs: [{ name: "index", type: "uint256" }],
-		outputs: [{ name: "", type: "bytes32" }],
-		stateMutability: "view",
-	},
-] as const;
-
 // Well-known Substrate dev account Ethereum private keys.
 // These are PUBLIC test keys from Substrate dev mnemonics — NEVER use for real funds.
 export const evmDevAccounts = [
@@ -92,7 +50,7 @@ export async function getChain(ethRpcUrl = getStoredEthRpcUrl()): Promise<Chain>
 		const chainId = await client.getChainId();
 		chainCache = defineChain({
 			id: chainId,
-			name: isLocalEthRpcUrl(ethRpcUrl) ? "Local Parachain" : "Polkadot Hub TestNet",
+			name: isLocalEthRpcUrl(ethRpcUrl) ? "Local RPC" : "Polkadot Hub TestNet",
 			nativeCurrency: isLocalEthRpcUrl(ethRpcUrl)
 				? { name: "PAS", symbol: "PAS", decimals: 18 }
 				: { name: "PAS", symbol: "PAS", decimals: 18 },

@@ -145,13 +145,13 @@ All defaults target Paseo TestNet. Override any of them via environment variable
 
 | Variable              | Default                                       |
 | --------------------- | --------------------------------------------- |
-| `APERIO_SIGNER_SURI`    | — (falls back to `~/.aperio/session.json`)      |
-| `CRRP_WS_URL`         | `wss://asset-hub-paseo.dotters.network`       |
-| `CRRP_ETH_RPC_URL`    | `https://services.polkadothub-rpc.com/testnet`|
-| `CRRP_BULLETIN_WS`    | `wss://paseo-bulletin-rpc.polkadot.io`        |
-| `CRRP_REGISTRY`       | `0x253028394517e27a6d22233e94b5b53c62926940`  |
-| `CRRP_BUNDLE_GATEWAY` | `https://paseo-ipfs.polkadot.io/ipfs`         |
-| `APERIO_STATE_DIR`      | `~/.aperio`                                     |
+| `APERIO_SIGNER_SURI`  | — (falls back to `~/.aperio/session.json`)    |
+| `APERIO_WS_URL`       | `wss://asset-hub-paseo.dotters.network`       |
+| `APERIO_ETH_RPC_URL`  | `https://services.polkadothub-rpc.com/testnet`|
+| `APERIO_BULLETIN_WS`  | `wss://paseo-bulletin-rpc.polkadot.io`        |
+| `APERIO_REGISTRY`     | `0x253028394517e27a6d22233e94b5b53c62926940`  |
+| `APERIO_BUNDLE_GATEWAY` | `https://paseo-ipfs.polkadot.io/ipfs`       |
+| `APERIO_STATE_DIR`    | `~/.aperio`                                   |
 
 ## Troubleshooting
 
@@ -159,7 +159,7 @@ All defaults target Paseo TestNet. Override any of them via environment variable
 `APERIO_SIGNER_SURI` in the environment. Either import a SURI or export the env var.
 
 **`Bulletin signer is not authorized`** — The test deployment's Alice permit may be
-exhausted or the endpoint changed. Re-check `CRRP_BULLETIN_WS`.
+exhausted or the endpoint changed. Re-check `APERIO_BULLETIN_WS`.
 
 **`Account not mapped yet`** — Run `aperio map` once. Subsequent write commands do this
 automatically on first use but the explicit command makes the cost visible.

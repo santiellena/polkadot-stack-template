@@ -13,22 +13,22 @@ var toBinary = (base64) => {
   return bytes;
 };
 
-// .papi/descriptors/src/stack_template.ts
-var descriptorValues = import("./descriptors-WIWSIN73.mjs").then((module) => module["Stack_template"]);
+// .papi/descriptors/src/asset_hub_paseo.ts
+var descriptorValues = import("./descriptors-NUL363K3.mjs").then((module) => module["Asset_hub_paseo"]);
 var metadataTypes = import("./metadataTypes-N3ONLFCD.mjs").then(
   (module) => toBinary("default" in module ? module.default : module)
 );
 var asset = {};
 var extensions = {};
-var getMetadata = () => import("./stack_template_metadata-VR46LRFX.mjs").then(
+var getMetadata = () => import("./asset_hub_paseo_metadata-LLUQMT4Q.mjs").then(
   (module) => toBinary("default" in module ? module.default : module)
 );
-var genesis = "0xfabc865c425835538637787950ba6ac393ec8d8b16e4efb4098f0c3adadda6d3";
+var genesis = "0x4545454545454545454545454545454545454545454545454545454545454545";
 var _allDescriptors = { descriptors: descriptorValues, metadataTypes, asset, extensions, getMetadata, genesis };
-var stack_template_default = _allDescriptors;
+var asset_hub_paseo_default = _allDescriptors;
 
 // .papi/descriptors/src/bulletin.ts
-var descriptorValues2 = import("./descriptors-WIWSIN73.mjs").then((module) => module["Bulletin"]);
+var descriptorValues2 = import("./descriptors-NUL363K3.mjs").then((module) => module["Bulletin"]);
 var metadataTypes2 = import("./metadataTypes-N3ONLFCD.mjs").then(
   (module) => toBinary("default" in module ? module.default : module)
 );
@@ -95,7 +95,7 @@ var XcmVersionedAsset = _Enum;
 
 // .papi/descriptors/src/index.ts
 var metadatas = {
-  ["0xcdf74524012c15ec3d6fe8f89b26224ad7b415388a7351073401a386b7aa26b0"]: stack_template_default,
+  ["0x5d82548ee8362ca123514269ea6df6f1ad252e4f120516b810bcb2cb29957eb8"]: asset_hub_paseo_default,
   ["0x1a82e5143be3211ded412b0368b486ce83bd41a80ec95eb267f6c204adda8365"]: bulletin_default
 };
 var getMetadata3 = async (codeHash) => {
@@ -155,7 +155,7 @@ export {
   XcmVersionedAssets,
   XcmVersionedLocation,
   XcmVersionedXcm,
+  asset_hub_paseo_default as asset_hub_paseo,
   bulletin_default as bulletin,
-  getMetadata3 as getMetadata,
-  stack_template_default as stack_template
+  getMetadata3 as getMetadata
 };

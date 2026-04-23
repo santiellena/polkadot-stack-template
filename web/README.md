@@ -1,27 +1,17 @@
 # Web
 
-This directory contains the React frontend for the template.
+React + TypeScript frontend for Aperio.
 
-## Overview
+The app focuses on the current Aperio MVP:
 
-The app uses:
-
-- React + Vite + TypeScript + Tailwind CSS
-- [Polkadot API (PAPI)](https://papi.how/) for pallet interaction
-- [viem](https://viem.sh/) for EVM and PVM contract interaction through `eth-rpc`
-- Zustand for state management
-
-Key pages now focus on the Aperio MVP:
-
-- repository discovery
-- repository overview
+- repository discovery and creation
+- proposal submission and review
+- maintainer merge flow
 - canonical commit history
-- role display for the active account
-- treasury donation flow
+- treasury donation and rewards
+- wallet and network configuration
 
 ## Local Development
-
-Run the frontend directly:
 
 ```bash
 cd web
@@ -29,54 +19,25 @@ npm install
 npm run dev
 ```
 
-Or, from the repo root, if the chain is already running and you want the scripted dev flow:
-
-```bash
-./scripts/start-frontend.sh
-```
-
-## Endpoint Configuration
-
-The app uses configurable Substrate WebSocket and Ethereum JSON-RPC endpoints.
-
-For hosted builds:
-
-```bash
-cp web/.env.example web/.env.local
-```
-
-Set:
-
-- `VITE_WS_URL`
-- `VITE_ETH_RPC_URL`
-- `VITE_CRRP_REGISTRY_ADDRESS`
-- `VITE_CRRP_REPO_ORGANIZATION` (optional default)
-- `VITE_CRRP_REPO_NAME` (optional default)
-
-For local scripted development, [`../scripts/start-all.sh`](../scripts/start-all.sh) and [`../scripts/start-frontend.sh`](../scripts/start-frontend.sh) export:
-
-- `VITE_LOCAL_WS_URL`
-- `VITE_LOCAL_ETH_RPC_URL`
-
-That keeps the browser aligned with the active local stack ports.
-
-## PAPI Descriptors
-
-Generated descriptors live in [`.papi/`](.papi/).
-
-Useful commands:
+## Build
 
 ```bash
 cd web
-npm run update-types
-npm run codegen
 npm run build
-npm run lint
-npm run fmt
 ```
 
-## Deployment Data
+The build runs PAPI code generation first, then TypeScript and Vite.
 
-The frontend keeps [`src/config/deployments.ts`](src/config/deployments.ts) checked in as a stub so a fresh clone still works. Contract deploy scripts update that file automatically after successful deployment.
+## Configuration
 
-See [`../contracts/README.md`](../contracts/README.md) for contract deployment flows and [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for hosted frontend deployment options.
+Useful build/runtime environment variables:
+
+- `VITE_WS_URL`
+- `VITE_ETH_RPC_URL`
+- `VITE_APERIO_REGISTRY_KIND`
+- `VITE_APERIO_REGISTRY_ADDRESS`
+- `VITE_APERIO_REPO_ORGANIZATION`
+- `VITE_APERIO_REPO_NAME`
+- `VITE_APERIO_BUNDLE_GATEWAY`
+
+Generated PAPI descriptors live in `.papi/` and are used by the frontend for Substrate extrinsics such as `pallet_revive`.

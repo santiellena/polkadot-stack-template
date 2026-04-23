@@ -3,13 +3,13 @@ import { keccak256 } from "viem";
 import { FixedSizeBinary } from "polkadot-api";
 import type { InjectedPolkadotAccount } from "polkadot-api/pjs-signer";
 import { getClient } from "../hooks/useChain";
-import { stack_template } from "@polkadot-api/descriptors";
+import { asset_hub_paseo } from "@polkadot-api/descriptors";
 import { useChainStore } from "../store/chainStore";
 
 type MappingStatus = "idle" | "checking" | "mapped" | "unmapped" | "mapping" | "error";
 
 // Derives the H160 EVM address from a 32-byte Substrate public key.
-// The runtime uses keccak256(publicKey)[12:32] for unmapped accounts.
+// pallet-revive uses keccak256(publicKey)[12:32] for unmapped accounts.
 // Registering via map_account activates this address on-chain.
 // Reference: https://docs.polkadot.com/smart-contracts/for-eth-devs/accounts/#polkadot-to-ethereum-mapping
 function deriveH160(publicKey: Uint8Array): `0x${string}` {
@@ -32,7 +32,7 @@ export function MapAccountButton({ account }: { account: InjectedPolkadotAccount
 			setStatus("checking");
 			setErrorMessage(null);
 			try {
-				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 				const info = await api.query.Revive.AccountInfoOf.getValue(
 					FixedSizeBinary.fromHex(h160),
 				);
@@ -52,7 +52,7 @@ export function MapAccountButton({ account }: { account: InjectedPolkadotAccount
 		setStatus("mapping");
 		setErrorMessage(null);
 		try {
-			const api = getClient(wsUrl).getTypedApi(stack_template);
+			const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 			const tx = api.tx.Revive.map_account();
 			await new Promise<void>((resolve, reject) => {
 				tx.signSubmitAndWatch(account.polkadotSigner).subscribe({

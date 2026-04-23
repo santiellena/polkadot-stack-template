@@ -1,6 +1,5 @@
 {
 	"recommendations": [
-		"rust-lang.rust-analyzer",
 		"esbenp.prettier-vscode",
 		"NomicFoundation.hardhat-solidity",
 		"dbaeumer.vscode-eslint",

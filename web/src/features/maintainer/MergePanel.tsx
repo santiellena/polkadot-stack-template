@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { stack_template } from "@polkadot-api/descriptors";
+import { asset_hub_paseo } from "@polkadot-api/descriptors";
 import { Binary, FixedSizeBinary } from "polkadot-api";
 import { encodeFunctionData, type Abi, type Hex } from "viem";
 import { getPublicClient } from "../../config/evm";
@@ -195,7 +195,7 @@ export function MergePanel({
 					functionName: "mergeProposal",
 					args: [repoId, BigInt(proposalId), finalCommitBytes32, effectiveCid],
 				});
-				const api = getClient(wsUrl).getTypedApi(stack_template);
+				const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 				const tx = api.tx.Revive.call({
 					dest: FixedSizeBinary.fromHex(registryAddress),
 					value: 0n,

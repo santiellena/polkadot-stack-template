@@ -48,9 +48,9 @@ export function parseBundleHeader(bytes: Uint8Array): BundleHeader {
 			const refname = line.slice(spaceIdx + 1);
 			refs.set(refname, sha);
 
-			// Prefer main/master, then any branch, then anything
+			// Aperio is single-branch: prefer main, then fall back to the first ref.
 			if (headCommit === null) headCommit = sha;
-			if (refname === "refs/heads/main" || refname === "refs/heads/master") {
+			if (refname === "refs/heads/main") {
 				headCommit = sha;
 			}
 		}

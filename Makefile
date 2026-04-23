@@ -39,7 +39,7 @@ deploy-paseo-pvm:
 # ─── Frontend deploy ──────────────────────────────────────────────────────────
 
 # Domain to deploy to — override with: make deploy-frontend DOMAIN=my-app.dot
-DOMAIN ?= polkadot-stack-template00.dot
+DOMAIN ?= aperio00.dot
 
 .PHONY: deploy-frontend
 deploy-frontend: build-frontend check-bulletin-deploy check-ipfs

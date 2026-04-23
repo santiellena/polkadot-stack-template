@@ -1,4 +1,4 @@
-# 🧾 Censorship-Resistant Repository Protocol (CRRP)
+# 🧾 Censorship-Resistant Repository Protocol (Aperio)
 
 ## Overview
 
@@ -271,6 +271,54 @@ Stores:
 - contributor paid on merge
 - reviewers paid if correct
 - treasury funds storage
+
+---
+
+## 🔭 Open Design Space
+
+These items are intentionally outside the current MVP, but they are valid extensions of
+the protocol and should be kept in mind when evolving the system.
+
+### Governance and Roles
+
+- A maintainer does not need to remain a single user address forever. In a fuller design,
+  the maintainer can be a DAO-controlled account and repository decisions can be made by
+  token holders or other governance participants.
+- Organization names are not currently restricted to a single controlling address. This is
+  intentional for the MVP because multiple maintainers may need to operate under the same
+  organization identity. A governance layer would be the natural place to coordinate this.
+
+### Review and Anti-Spam Mechanisms
+
+- A future slashing mechanism could let maintainers or governance systems penalize reviewers
+  who behave maliciously or repeatedly fail to perform their duties correctly.
+- If proposal spam becomes a real operational problem, proposal submission fees could be
+  added and later released or refunded when a proposal is successfully merged.
+
+### Treasury Evolution
+
+- The treasury is currently modeled around contributor and reviewer payouts, but that is not
+  its only plausible use. Governance could also allocate treasury funds to operational tasks
+  such as refreshing the latest CID on Bulletin or other repository-maintenance actions.
+
+### Release and Distribution UX
+
+- The protocol already models releases, but a stronger end-user release experience is still
+  open territory. In particular, direct download flows for release artifacts such as bundled
+  binaries or compressed deliverables would improve usability for non-developer consumers.
+
+### Scalability Limits
+
+- The current architecture is constrained by the maximum amount of data that can be submitted
+  to the Bulletin chain. Very large repositories or very large artifact snapshots may require
+  different packaging or storage strategies in the future.
+
+### Statement Store Collaboration
+
+- The Statement Store is not used in the MVP, but it is a natural extension point for
+  contributor-maintainer-reviewer coordination. It could support discussion threads, review
+  feedback, clarification requests, and other context that is not fully captured by code
+  alone.
 
 ---
 

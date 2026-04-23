@@ -1,5 +1,5 @@
 {
-  "name": "polkadot-stack-template-web",
+  "name": "aperio-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,7 +12,6 @@
     "update-types": "papi update",
     "dev": "vite",
     "dev:paseo": "vite --mode paseo",
-    "dev:blockchain": "npm run update-types && vite",
     "build": "npm run codegen && tsc -b && vite build",
     "postinstall": "npm run codegen",
     "lint": "eslint .",

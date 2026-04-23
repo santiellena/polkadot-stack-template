@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Binary, FixedSizeBinary } from "polkadot-api";
-import { stack_template } from "@polkadot-api/descriptors";
+import { asset_hub_paseo } from "@polkadot-api/descriptors";
 import { encodeFunctionData, keccak256, type Abi } from "viem";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
@@ -206,7 +206,7 @@ export default function CreateProposalRoute() {
 						functionName: opts.functionName,
 						args: opts.args ?? [],
 					});
-					const api = getClient(wsUrl).getTypedApi(stack_template);
+					const api = getClient(wsUrl).getTypedApi(asset_hub_paseo);
 					const tx = api.tx.Revive.call({
 						dest: FixedSizeBinary.fromHex(opts.address),
 						value: 0n,

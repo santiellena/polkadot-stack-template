@@ -10,7 +10,6 @@ const LeaderboardRoute = lazy(() => import("./routes/LeaderboardRoute"));
 const RepoRoute = lazy(() => import("./routes/RepoRoute"));
 const RepoHistoryRoute = lazy(() => import("./routes/RepoHistoryRoute"));
 const RepoLeaderboardRoute = lazy(() => import("./routes/RepoLeaderboardRoute"));
-// const RepoTreeRoute = lazy(() => import("./routes/RepoTreeRoute"));
 const CreateProposalRoute = lazy(() => import("./routes/CreateProposalRoute"));
 const RepoProposalsRoute = lazy(() => import("./routes/RepoProposalsRoute"));
 const DocsRoute = lazy(() => import("./routes/DocsRoute"));
