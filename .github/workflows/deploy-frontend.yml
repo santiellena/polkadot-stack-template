@@ -98,6 +98,11 @@ jobs:
       register-base: true
       skip-cache: ${{ inputs.skip-cache || false }}
       max-retries: 3
+      # Match the RPC endpoints the frontend uses so deploys hit the same
+      # nodes that end users do (see web/src/hooks/useBulletin.ts and
+      # web/src/config/network.ts). The CLI defaults have been unreachable.
+      bulletin-rpc: wss://paseo-bulletin-rpc.polkadot.io
+      rpc: wss://asset-hub-paseo.dotters.network
     secrets:
       # Falls back to Alice's dev account if DOTNS_MNEMONIC is not set.
       # Alice works for free registration on Paseo testnet.
