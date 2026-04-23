@@ -63,7 +63,9 @@ export function TreasuryDonationCard({
 
 	const treasuryReady = Boolean(treasuryAddress) && Boolean(account || substrateH160);
 	const claimReady =
-		Boolean(treasuryAddress) && Boolean(account || substrateAccount) && Boolean(userClaimable && userClaimable > 0n);
+		Boolean(treasuryAddress) &&
+		Boolean(account || substrateAccount) &&
+		Boolean(userClaimable && userClaimable > 0n);
 
 	const readRepoTreasuryBalance = async () => {
 		if (!treasuryAddress) {
@@ -137,22 +139,22 @@ export function TreasuryDonationCard({
 			const hash =
 				opts.functionName === "donate"
 					? await walletClient.writeContract({
-						address: treasuryAddress,
-						abi: aperioTreasuryAbi,
-						functionName: "donate",
-						args: opts.args,
-						value: opts.value ?? 0n,
-						account: walletClient.account as unknown as Address,
-						chain: walletClient.chain,
-					})
+							address: treasuryAddress,
+							abi: aperioTreasuryAbi,
+							functionName: "donate",
+							args: opts.args,
+							value: opts.value ?? 0n,
+							account: walletClient.account as unknown as Address,
+							chain: walletClient.chain,
+						})
 					: await walletClient.writeContract({
-						address: treasuryAddress,
-						abi: aperioTreasuryAbi,
-						functionName: "claim",
-						args: opts.args,
-						account: walletClient.account as unknown as Address,
-						chain: walletClient.chain,
-					});
+							address: treasuryAddress,
+							abi: aperioTreasuryAbi,
+							functionName: "claim",
+							args: opts.args,
+							account: walletClient.account as unknown as Address,
+							chain: walletClient.chain,
+						});
 			const publicClient = getPublicClient(getStoredEthRpcUrl());
 			await publicClient.waitForTransactionReceipt({ hash });
 			return hash;
@@ -173,41 +175,44 @@ export function TreasuryDonationCard({
 				data: Binary.fromHex(calldata),
 			});
 			await new Promise<void>((resolve, reject) => {
-				const subscription = tx.signSubmitAndWatch(substrateAccount.polkadotSigner).subscribe({
-					next: (ev) => {
-						const landed =
-							(ev.type === "txBestBlocksState" && ev.found === true) || ev.type === "finalized";
-						if (!landed) return;
-						subscription.unsubscribe();
-						if (ev.ok) {
-							resolve();
-							return;
-						}
-						console.error("Treasury Revive.call failed", {
-							functionName: opts.functionName,
-							repoId: opts.args[0],
-							treasuryAddress,
-							value: opts.value ?? 0n,
-							event: ev,
-						});
-						reject(
-							new Error(
-								`Revive.call ${opts.functionName} failed: ${formatDispatchError(ev.dispatchError)} (event=${ev.type})`,
-							),
-						);
-					},
-					error: (cause) => {
-						subscription.unsubscribe();
-						console.error("Treasury Revive.call submission error", {
-							functionName: opts.functionName,
-							repoId: opts.args[0],
-							treasuryAddress,
-							value: opts.value ?? 0n,
-							cause,
-						});
-						reject(cause);
-					},
-				});
+				const subscription = tx
+					.signSubmitAndWatch(substrateAccount.polkadotSigner)
+					.subscribe({
+						next: (ev) => {
+							const landed =
+								(ev.type === "txBestBlocksState" && ev.found === true) ||
+								ev.type === "finalized";
+							if (!landed) return;
+							subscription.unsubscribe();
+							if (ev.ok) {
+								resolve();
+								return;
+							}
+							console.error("Treasury Revive.call failed", {
+								functionName: opts.functionName,
+								repoId: opts.args[0],
+								treasuryAddress,
+								value: opts.value ?? 0n,
+								event: ev,
+							});
+							reject(
+								new Error(
+									`Revive.call ${opts.functionName} failed: ${formatDispatchError(ev.dispatchError)} (event=${ev.type})`,
+								),
+							);
+						},
+						error: (cause) => {
+							subscription.unsubscribe();
+							console.error("Treasury Revive.call submission error", {
+								functionName: opts.functionName,
+								repoId: opts.args[0],
+								treasuryAddress,
+								value: opts.value ?? 0n,
+								cause,
+							});
+							reject(cause);
+						},
+					});
 			});
 			return null;
 		}
@@ -284,7 +289,8 @@ export function TreasuryDonationCard({
 		try {
 			if (substrateAccount) {
 				const api = getClient(wsUrl).getTypedApi(stack_template);
-				freeBalance = (await api.query.System.Account.getValue(substrateAccount.address)).data.free;
+				freeBalance = (await api.query.System.Account.getValue(substrateAccount.address))
+					.data.free;
 			}
 			const hash = await execTreasuryWrite({
 				functionName: "claim",
@@ -349,7 +355,10 @@ export function TreasuryDonationCard({
 				<ValueBlock label="Balance" value={formatEthAmount(balance)} />
 				<ValueBlock label="Total Claimable" value={formatEthAmount(totalClaimable)} />
 				<ValueBlock label="Your Claimable" value={formatEthAmount(userClaimable)} />
-				<ValueBlock label="Contributor Reward" value={formatEthAmount(contributionReward)} />
+				<ValueBlock
+					label="Contributor Reward"
+					value={formatEthAmount(contributionReward)}
+				/>
 				<ValueBlock label="Reviewer Reward" value={formatEthAmount(reviewReward)} />
 				<ValueBlock label="Unfunded Claimable" value={formatEthAmount(unfundedClaimable)} />
 				<ValueBlock label="Current Signer" value={signerLabel} />

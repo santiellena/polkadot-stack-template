@@ -81,7 +81,8 @@ export function LeaderboardTable({
 											{repo.organization}/{repo.repository}
 										</div>
 										<div className="font-mono">
-											{formatEthAmount(repo.earned)} earned, {formatEthAmount(repo.claimed)} claimed
+											{formatEthAmount(repo.earned)} earned,{" "}
+											{formatEthAmount(repo.claimed)} claimed
 										</div>
 									</div>
 								))}

@@ -42,11 +42,11 @@ export default function RepoProposalsRoute() {
 		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
 		: null;
 	const effectiveAccount = substrateH160 ?? account;
-	const { repo, loading: repoLoading, refresh: refreshRepo } = useRepoOverview(
-		rawOrg,
-		rawRepo,
-		effectiveAccount,
-	);
+	const {
+		repo,
+		loading: repoLoading,
+		refresh: refreshRepo,
+	} = useRepoOverview(rawOrg, rawRepo, effectiveAccount);
 
 	const [proposals, setProposals] = useState<ProposalEntry[]>([]);
 	const [proposalsLoading, setProposalsLoading] = useState(false);
@@ -83,13 +83,14 @@ export default function RepoProposalsRoute() {
 				readRepoProposals(repo.repoId),
 				effectiveAccount && repo.roles.isReviewer
 					? Promise.all(
-							ids.map((i) =>
-								client.readContract({
-									address: registryAddress,
-									abi: aperioRegistryAbi,
-									functionName: "getReview",
-									args: [repo.repoId, BigInt(i), effectiveAccount],
-								}) as Promise<ReviewReadResult>,
+							ids.map(
+								(i) =>
+									client.readContract({
+										address: registryAddress,
+										abi: aperioRegistryAbi,
+										functionName: "getReview",
+										args: [repo.repoId, BigInt(i), effectiveAccount],
+									}) as Promise<ReviewReadResult>,
 							),
 						)
 					: Promise.resolve(null),
@@ -270,8 +271,9 @@ export default function RepoProposalsRoute() {
 							proposal.status === 1 &&
 							!proposal.reviewerVote?.exists;
 						const bundleUrl = buildBundleUrl(proposal.proposedCid);
-						const mergedBundleUrl =
-							proposal.mergedCid ? buildBundleUrl(proposal.mergedCid) : null;
+						const mergedBundleUrl = proposal.mergedCid
+							? buildBundleUrl(proposal.mergedCid)
+							: null;
 						const statusClass =
 							STATUS_CLASS[proposal.status] ??
 							"border-white/[0.06] bg-white/[0.03] text-text-secondary";
@@ -382,7 +384,9 @@ export default function RepoProposalsRoute() {
 										proposalId={proposalNumber}
 										proposedCommit={proposal.proposedCommit}
 										proposedCid={proposal.proposedCid}
-										canMerge={proposal.approvals > 0n && proposal.rejections === 0n}
+										canMerge={
+											proposal.approvals > 0n && proposal.rejections === 0n
+										}
 										onMerged={refresh}
 									/>
 								) : null}
@@ -400,13 +404,12 @@ export default function RepoProposalsRoute() {
 												this proposal.
 												{proposalTxStatus ? ` ${proposalTxStatus}` : ""}
 											</span>
-										) 
-										// : isOwnProposal ? (
+										) : // : isOwnProposal ? (
 										// 	<span className="text-sm text-text-tertiary">
 										// 		You cannot review your own proposal.
 										// 	</span>
-										// ) 
-										: proposal.status !== 1 ? (
+										// )
+										proposal.status !== 1 ? (
 											<span className="text-sm text-text-tertiary">
 												This proposal is no longer open for review.
 											</span>
@@ -420,16 +423,24 @@ export default function RepoProposalsRoute() {
 														variant="approve"
 														title="Looks Good"
 														description="Endorse this proposal. The maintainer will decide whether to merge it — your approval does not trigger a merge."
-														label={isSubmitting ? "Submitting…" : "Approve"}
-														onClick={() => void submitReview(proposalNumber, true)}
+														label={
+															isSubmitting ? "Submitting…" : "Approve"
+														}
+														onClick={() =>
+															void submitReview(proposalNumber, true)
+														}
 														disabled={isSubmitting}
 													/>
 													<ReviewOption
 														variant="reject"
 														title="Not Relevant"
 														description="Close this proposal permanently. Use this when the contribution doesn't make sense or isn't ready."
-														label={isSubmitting ? "Submitting…" : "Reject"}
-														onClick={() => void submitReview(proposalNumber, false)}
+														label={
+															isSubmitting ? "Submitting…" : "Reject"
+														}
+														onClick={() =>
+															void submitReview(proposalNumber, false)
+														}
 														disabled={isSubmitting}
 													/>
 												</div>
@@ -471,8 +482,7 @@ function ReviewOption({
 			? {
 					card: "border-emerald-500/20 bg-emerald-500/5",
 					title: "text-emerald-300",
-					button:
-						"border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
+					button: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
 				}
 			: {
 					card: "border-red-500/20 bg-red-500/5",
@@ -495,21 +505,11 @@ function ReviewOption({
 	);
 }
 
-function InfoRow({
-	label,
-	value,
-	mono = false,
-}: {
-	label: string;
-	value: string;
-	mono?: boolean;
-}) {
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
 	return (
 		<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
 			<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">{label}</div>
-			<div
-				className={`mt-1 break-all text-sm text-text-primary ${mono ? "font-mono" : ""}`}
-			>
+			<div className={`mt-1 break-all text-sm text-text-primary ${mono ? "font-mono" : ""}`}>
 				{value || "—"}
 			</div>
 		</div>

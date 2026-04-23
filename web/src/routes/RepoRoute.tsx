@@ -18,7 +18,8 @@ import {
 export default function RepoRoute() {
 	const { organization, repository } = useParams();
 	const { account, sourceLabel } = useWalletSession();
-	const { browserAccounts, selectedBrowserAccountIndex, browserSourceLabel } = useSubstrateSession();
+	const { browserAccounts, selectedBrowserAccountIndex, browserSourceLabel } =
+		useSubstrateSession();
 	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
 	const substrateH160 = substrateAccount
 		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
@@ -29,7 +30,11 @@ export default function RepoRoute() {
 		: account
 			? `${sourceLabel}: ${account}`
 			: "Using local dev fallback";
-	const { repo, loading, error, refresh } = useRepoOverview(organization, repository, effectiveAccount);
+	const { repo, loading, error, refresh } = useRepoOverview(
+		organization,
+		repository,
+		effectiveAccount,
+	);
 	const { entries: leaderboardEntries, loading: leaderboardLoading } = useRepoLeaderboard(
 		repo?.repoId,
 		repo?.organization,
@@ -68,12 +73,17 @@ export default function RepoRoute() {
 					<div className="space-y-5">
 						<div>
 							<div className="eyebrow">Canonical Repository State</div>
-							<h1 className="page-title mt-2">{repo.organization}/{repo.repository}</h1>
+							<h1 className="page-title mt-2">
+								{repo.organization}/{repo.repository}
+							</h1>
 							<p className="mt-3 max-w-3xl text-text-secondary">
-								The contract records the selected `HEAD`, proposal counters, releases, and
-								role permissions. Repository code remains off-chain and is addressed by CID.
+								The contract records the selected `HEAD`, proposal counters,
+								releases, and role permissions. Repository code remains off-chain
+								and is addressed by CID.
 							</p>
-							<p className="mt-3 break-all font-mono text-xs text-text-tertiary">{repo.repoId}</p>
+							<p className="mt-3 break-all font-mono text-xs text-text-tertiary">
+								{repo.repoId}
+							</p>
 						</div>
 						<div className="grid gap-3 md:grid-cols-3">
 							<StateStat
@@ -100,7 +110,9 @@ export default function RepoRoute() {
 								{repo.latestCid ? "Bundle linked" : "No bundle linked"}
 							</span>
 							<span className="status-chip border-white/[0.08] bg-white/[0.04] text-text-secondary">
-								{repo.permissionlessContributions ? "Open contributions" : "Whitelisted contributions"}
+								{repo.permissionlessContributions
+									? "Open contributions"
+									: "Whitelisted contributions"}
 							</span>
 						</div>
 					</div>
@@ -116,13 +128,17 @@ export default function RepoRoute() {
 							<RoleBadge label="Maintainer" active={repo.roles.isMaintainer} />
 							<RoleBadge
 								label="Contributor"
-								active={repo.roles.isContributor || repo.permissionlessContributions}
+								active={
+									repo.roles.isContributor || repo.permissionlessContributions
+								}
 							/>
 							<RoleBadge label="Reviewer" active={repo.roles.isReviewer} />
 						</div>
 						<div className="text-sm text-text-secondary">
 							<div className="panel-label">Signed-in account</div>
-							<div className="mt-2 break-all font-mono text-text-primary">{signedInLabel}</div>
+							<div className="mt-2 break-all font-mono text-text-primary">
+								{signedInLabel}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -146,10 +162,7 @@ export default function RepoRoute() {
 				>
 					View History
 				</Link>
-				<span
-					className="btn-secondary cursor-not-allowed opacity-40"
-					title="Coming soon"
-				>
+				<span className="btn-secondary cursor-not-allowed opacity-40" title="Coming soon">
 					Tree
 				</span>
 				<Link
@@ -175,10 +188,18 @@ export default function RepoRoute() {
 						<h2 className="section-title mt-2">Selected by the contract</h2>
 					</div>
 					<div className="grid gap-3 md:grid-cols-2">
-						<DataPanel label="Latest commit" value={formatGitCommitHash(repo.latestCommitHash)} mono />
+						<DataPanel
+							label="Latest commit"
+							value={formatGitCommitHash(repo.latestCommitHash)}
+							mono
+						/>
 						<DataPanel label="Latest CID" value={repo.latestCid || "Not set"} mono />
 						<DataPanel label="Maintainer" value={repo.maintainer} mono />
-						<DataPanel label="Treasury" value={repo.treasuryAddress || "Not configured"} mono />
+						<DataPanel
+							label="Treasury"
+							value={repo.treasuryAddress || "Not configured"}
+							mono
+						/>
 						<DataPanel label="Registry" value={repo.registryAddress} mono />
 						<DataPanel
 							label="Treasury balance"
@@ -223,8 +244,8 @@ export default function RepoRoute() {
 							<div className="eyebrow">Artifacts</div>
 							<h2 className="section-title mt-2">Download and reconstruct</h2>
 							<p className="mt-1 text-sm text-text-secondary">
-								Artifacts are Git bundles. Download the latest CID and reconstruct repository
-								state locally before reviewing or reusing it.
+								Artifacts are Git bundles. Download the latest CID and reconstruct
+								repository state locally before reviewing or reusing it.
 							</p>
 						</div>
 						<button onClick={refresh} className="btn-secondary">
@@ -268,8 +289,8 @@ git log bundle-main --oneline`}
 						</>
 					) : (
 						<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
-							No latest CID is available yet, so the web app cannot offer bundle download
-							instructions.
+							No latest CID is available yet, so the web app cannot offer bundle
+							download instructions.
 						</div>
 					)}
 				</div>
@@ -287,7 +308,9 @@ git log bundle-main --oneline`}
 							>
 								<div className="flex items-center justify-between gap-3">
 									<div className="text-sm font-medium text-text-primary">
-										{entry.type === "initial" ? "Repository created" : "Merged proposal"}
+										{entry.type === "initial"
+											? "Repository created"
+											: "Merged proposal"}
 									</div>
 									<div className="text-xs text-text-tertiary">
 										{formatRepoTimestamp(entry.timestamp)}
@@ -321,7 +344,9 @@ git log bundle-main --oneline`}
 						Open Full Leaderboard
 					</Link>
 				</div>
-				{leaderboardLoading ? <div className="h-24 animate-pulse rounded-lg bg-white/[0.03]" /> : null}
+				{leaderboardLoading ? (
+					<div className="h-24 animate-pulse rounded-lg bg-white/[0.03]" />
+				) : null}
 				{!leaderboardLoading ? (
 					<LeaderboardTable
 						entries={leaderboardEntries.slice(0, 3)}

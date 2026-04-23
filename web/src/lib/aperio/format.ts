@@ -27,8 +27,7 @@ export function formatGitCommitHash(value: string) {
 
 export function gitCommitHashToBytes32(value: string): Hex {
 	const trimmed = value.trim();
-	const body =
-		trimmed.startsWith("0x") || trimmed.startsWith("0X") ? trimmed.slice(2) : trimmed;
+	const body = trimmed.startsWith("0x") || trimmed.startsWith("0X") ? trimmed.slice(2) : trimmed;
 	if (!/^[0-9a-fA-F]+$/.test(body)) {
 		throw new Error("Commit hash must be hexadecimal");
 	}

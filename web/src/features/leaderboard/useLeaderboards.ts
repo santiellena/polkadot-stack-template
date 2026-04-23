@@ -46,7 +46,9 @@ export function useGlobalLeaderboard() {
 						summary: EMPTY_SUMMARY,
 						loading: false,
 						error:
-							cause instanceof Error ? cause.message : "Failed to load global leaderboard",
+							cause instanceof Error
+								? cause.message
+								: "Failed to load global leaderboard",
 					});
 				}
 			}
@@ -90,7 +92,12 @@ export function useRepoLeaderboard(
 
 			setState((current) => ({ ...current, loading: true, error: null }));
 			try {
-				const result = await readRepoLeaderboard(repoId, organization, repository, treasuryAddress ?? null);
+				const result = await readRepoLeaderboard(
+					repoId,
+					organization,
+					repository,
+					treasuryAddress ?? null,
+				);
 				if (!cancelled) {
 					setState({ ...result, loading: false, error: null });
 				}
@@ -100,7 +107,10 @@ export function useRepoLeaderboard(
 						entries: [],
 						summary: EMPTY_SUMMARY,
 						loading: false,
-						error: cause instanceof Error ? cause.message : "Failed to load repo leaderboard",
+						error:
+							cause instanceof Error
+								? cause.message
+								: "Failed to load repo leaderboard",
 					});
 				}
 			}

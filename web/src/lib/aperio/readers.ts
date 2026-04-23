@@ -120,24 +120,27 @@ async function getRepoTreasurySnapshot(repoId: Hex): Promise<{
 	}
 
 	const participants = await Promise.all(
-		Array.from({ length: Number(participantCount) }, (_, index) =>
-			client.readContract({
-				address: treasuryAddress,
-				abi: aperioTreasuryAbi,
-				functionName: "getRepoParticipantAt",
-				args: [repoId, BigInt(index)],
-			}) as Promise<Address>,
+		Array.from(
+			{ length: Number(participantCount) },
+			(_, index) =>
+				client.readContract({
+					address: treasuryAddress,
+					abi: aperioTreasuryAbi,
+					functionName: "getRepoParticipantAt",
+					args: [repoId, BigInt(index)],
+				}) as Promise<Address>,
 		),
 	);
 
 	const rewardStatsByParticipant = await Promise.all(
-		participants.map((account) =>
-			client.readContract({
-				address: treasuryAddress,
-				abi: aperioTreasuryAbi,
-				functionName: "getRepoRewardStats",
-				args: [repoId, account],
-			}) as Promise<RewardStatsReadResult>,
+		participants.map(
+			(account) =>
+				client.readContract({
+					address: treasuryAddress,
+					abi: aperioTreasuryAbi,
+					functionName: "getRepoRewardStats",
+					args: [repoId, account],
+				}) as Promise<RewardStatsReadResult>,
 		),
 	);
 
@@ -262,24 +265,27 @@ async function aggregateLeaderboard(
 		]);
 
 		const participants = await Promise.all(
-			Array.from({ length: Number(participantCount) }, (_, index) =>
-				client.readContract({
-					address: target.address,
-					abi: aperioTreasuryAbi,
-					functionName: "getRepoParticipantAt",
-					args: [repoId, BigInt(index)],
-				}) as Promise<Address>,
+			Array.from(
+				{ length: Number(participantCount) },
+				(_, index) =>
+					client.readContract({
+						address: target.address,
+						abi: aperioTreasuryAbi,
+						functionName: "getRepoParticipantAt",
+						args: [repoId, BigInt(index)],
+					}) as Promise<Address>,
 			),
 		);
 
 		const rewardStatsByParticipant = await Promise.all(
-			participants.map((account) =>
-				client.readContract({
-					address: target.address,
-					abi: aperioTreasuryAbi,
-					functionName: "getRepoRewardStats",
-					args: [repoId, account],
-				}) as Promise<RewardStatsReadResult>,
+			participants.map(
+				(account) =>
+					client.readContract({
+						address: target.address,
+						abi: aperioTreasuryAbi,
+						functionName: "getRepoRewardStats",
+						args: [repoId, account],
+					}) as Promise<RewardStatsReadResult>,
 			),
 		);
 
@@ -307,17 +313,15 @@ async function aggregateLeaderboard(
 			entry.lastRewardAt = Math.max(entry.lastRewardAt ?? 0, lastRewardAt ?? 0) || null;
 			entry.lastClaimAt = Math.max(entry.lastClaimAt ?? 0, lastClaimAt ?? 0) || null;
 
-			const repoStats =
-				entry.repos.get(repoId.toLowerCase()) ??
-				{
-					repoId,
-					organization: repoMeta.organization,
-					repository: repoMeta.repository,
-					earned: 0n,
-					claimed: 0n,
-					contributionCount: 0,
-					reviewCount: 0,
-				};
+			const repoStats = entry.repos.get(repoId.toLowerCase()) ?? {
+				repoId,
+				organization: repoMeta.organization,
+				repository: repoMeta.repository,
+				earned: 0n,
+				claimed: 0n,
+				contributionCount: 0,
+				reviewCount: 0,
+			};
 			repoStats.earned += earned;
 			repoStats.claimed += claimed;
 			repoStats.contributionCount += contributionCount;
@@ -370,13 +374,15 @@ export async function listRepos(): Promise<RepoListItem[]> {
 	})) as bigint;
 
 	const repoIds = await Promise.all(
-		Array.from({ length: Number(repoCount) }, (_, index) =>
-			client.readContract({
-				address: getRegistryAddress(),
-				abi: aperioRegistryAbi,
-				functionName: "getRepoIdAt",
-				args: [BigInt(index)],
-			}) as Promise<Hex>,
+		Array.from(
+			{ length: Number(repoCount) },
+			(_, index) =>
+				client.readContract({
+					address: getRegistryAddress(),
+					abi: aperioRegistryAbi,
+					functionName: "getRepoIdAt",
+					args: [BigInt(index)],
+				}) as Promise<Hex>,
 		),
 	);
 
@@ -403,7 +409,9 @@ export async function listRepos(): Promise<RepoListItem[]> {
 		}),
 	);
 
-	return items.sort((left, right) => Number((right.blockNumber ?? 0n) - (left.blockNumber ?? 0n)));
+	return items.sort((left, right) =>
+		Number((right.blockNumber ?? 0n) - (left.blockNumber ?? 0n)),
+	);
 }
 
 export async function readRepoProposals(repoId: Hex): Promise<RepoProposal[]> {
@@ -484,8 +492,8 @@ export async function readRepoHistory(repoId: Hex): Promise<RepoHistoryEntry[]> 
 			proposalId: proposal.id,
 		}));
 
-	return [...initialEntries, ...mergeEntries].sort(
-		(left, right) => Number((right.blockNumber ?? 0n) - (left.blockNumber ?? 0n)),
+	return [...initialEntries, ...mergeEntries].sort((left, right) =>
+		Number((right.blockNumber ?? 0n) - (left.blockNumber ?? 0n)),
 	);
 }
 
@@ -495,13 +503,15 @@ export async function readRepoReleases(repoId: Hex): Promise<RepoRelease[]> {
 	const releaseCount = Number(repo[4]);
 
 	const releases = await Promise.all(
-		Array.from({ length: releaseCount }, (_, index) =>
-			client.readContract({
-				address: getRegistryAddress(),
-				abi: aperioRegistryAbi,
-				functionName: "getReleaseAt",
-				args: [repoId, BigInt(index)],
-			}) as Promise<ReleaseRecordReadResult>,
+		Array.from(
+			{ length: releaseCount },
+			(_, index) =>
+				client.readContract({
+					address: getRegistryAddress(),
+					abi: aperioRegistryAbi,
+					functionName: "getReleaseAt",
+					args: [repoId, BigInt(index)],
+				}) as Promise<ReleaseRecordReadResult>,
 		),
 	);
 
@@ -524,19 +534,20 @@ export async function readRepoOverview(
 	const repoId = deriveRepoId(organization, repository);
 	const client = getPublicClient(getStoredEthRpcUrl());
 	const registryAddress = getRegistryAddress();
-	const [repo, metadata, history, releases, roles, permissionlessContributions] = await Promise.all([
-		getRepo(repoId),
-		getRepoMetadata(repoId),
-		readRepoHistory(repoId),
-		readRepoReleases(repoId),
-		readRepoRoles(repoId, account),
-		client.readContract({
-			address: registryAddress,
-			abi: aperioRegistryAbi,
-			functionName: "isPermissionlessContributions",
-			args: [repoId],
-		}) as Promise<boolean>,
-	]);
+	const [repo, metadata, history, releases, roles, permissionlessContributions] =
+		await Promise.all([
+			getRepo(repoId),
+			getRepoMetadata(repoId),
+			readRepoHistory(repoId),
+			readRepoReleases(repoId),
+			readRepoRoles(repoId, account),
+			client.readContract({
+				address: registryAddress,
+				abi: aperioRegistryAbi,
+				functionName: "isPermissionlessContributions",
+				args: [repoId],
+			}) as Promise<boolean>,
+		]);
 
 	const treasuryAddressRaw = await getRepoTreasuryAddress(repoId);
 	const treasuryAddress =

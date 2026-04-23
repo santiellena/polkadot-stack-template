@@ -28,7 +28,7 @@ async function expectRevert(txPromise: Promise<unknown>, expectedMessage: string
 	}
 }
 
-describe("AperioRepositoryRegistry (EVM)", function () {
+describe("AperioRepositoryRegistry (PVM)", function () {
 	async function deployFixture() {
 		const [maintainer, contributor, reviewer, otherReviewer, outsider] =
 			await hre.viem.getWalletClients();

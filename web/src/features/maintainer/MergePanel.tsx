@@ -306,9 +306,9 @@ export function MergePanel({
 									Merge This Proposal
 								</div>
 								<p className="mt-1 text-xs text-text-secondary">
-									Provide the final canonical commit hash and the merged bundle. The
-									commit may differ from the proposed one if you applied minor changes
-									locally before merging.
+									Provide the final canonical commit hash and the merged bundle.
+									The commit may differ from the proposed one if you applied minor
+									changes locally before merging.
 								</p>
 							</div>
 
@@ -322,8 +322,8 @@ export function MergePanel({
 									className="input-field w-full font-mono"
 								/>
 								<p className="mt-1 text-xs text-text-tertiary">
-									Pre-filled with the proposed commit. Change if you amended it before
-									merging.
+									Pre-filled with the proposed commit. Change if you amended it
+									before merging.
 								</p>
 							</div>
 
@@ -364,8 +364,8 @@ export function MergePanel({
 											className="input-field w-full font-mono"
 										/>
 										<p className="mt-1 text-xs text-text-tertiary">
-											CID of the merged canonical bundle already uploaded to the
-											Bulletin chain.
+											CID of the merged canonical bundle already uploaded to
+											the Bulletin chain.
 										</p>
 									</div>
 								) : (
@@ -413,11 +413,14 @@ export function MergePanel({
 													Browser / Host
 												</button>
 											</div>
-											{substrateSource === "dev" && canUseDevSubstrateSigner ? (
+											{substrateSource === "dev" &&
+											canUseDevSubstrateSigner ? (
 												<select
 													value={substrateDevAccountIndex}
 													onChange={(e) =>
-														setSubstrateDevAccountIndex(Number(e.target.value))
+														setSubstrateDevAccountIndex(
+															Number(e.target.value),
+														)
 													}
 													className="input-field w-full"
 												>
@@ -432,7 +435,9 @@ export function MergePanel({
 												<div className="space-y-2">
 													<div className="text-xs text-text-tertiary">
 														Host: {hostStatus}
-														{browserSourceLabel ? ` · ${browserSourceLabel}` : ""}
+														{browserSourceLabel
+															? ` · ${browserSourceLabel}`
+															: ""}
 													</div>
 													{browserAccounts.length > 0 ? (
 														<select
@@ -446,7 +451,8 @@ export function MergePanel({
 														>
 															{browserAccounts.map((a, i) => (
 																<option key={a.address} value={i}>
-																	{a.name || "Account"} ({a.address})
+																	{a.name || "Account"} (
+																	{a.address})
 																</option>
 															))}
 														</select>
@@ -458,7 +464,9 @@ export function MergePanel({
 																<button
 																	key={w}
 																	onClick={() =>
-																		void connectSubstrateWallet(w)
+																		void connectSubstrateWallet(
+																			w,
+																		)
 																	}
 																	className="btn-secondary text-xs"
 																>

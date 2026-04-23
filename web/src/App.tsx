@@ -25,22 +25,22 @@ export default function App() {
 			<nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-surface-950/80 backdrop-blur-xl">
 				<div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-4 py-3">
 					<Link to="/" className="flex shrink-0 items-center gap-3">
-							<img
-								src={aperioLogo}
-								alt="Aperio logo"
-								className="h-10 w-10 rounded-lg object-cover"
-							/>
-							<div className="min-w-0">
-								<div
-									className="text-base font-semibold text-white tracking-tight"
-									title="From Latin, aperio: to open, uncover, reveal, to make accessible"
-								>
-									Aperio
-								</div>
-								<div className="truncate text-xs text-text-tertiary">
-									Canonical repository state, proposals, bundles
-								</div>
+						<img
+							src={aperioLogo}
+							alt="Aperio logo"
+							className="h-10 w-10 rounded-lg object-cover"
+						/>
+						<div className="min-w-0">
+							<div
+								className="text-base font-semibold text-white tracking-tight"
+								title="From Latin, aperio: to open, uncover, reveal, to make accessible"
+							>
+								Aperio
 							</div>
+							<div className="truncate text-xs text-text-tertiary">
+								Canonical repository state, proposals, bundles
+							</div>
+						</div>
 					</Link>
 
 					<div className="hidden h-8 w-px shrink-0 bg-white/[0.08] lg:block" />
@@ -63,13 +63,18 @@ export default function App() {
 										: "Not connected"
 							}
 						/>
-						{substrateAccount
-							? <MapAccountButton account={substrateAccount} />
-							: <MetaPill label="EVM Address" value="No wallet" />
-						}
+						{substrateAccount ? (
+							<MapAccountButton account={substrateAccount} />
+						) : (
+							<MetaPill label="EVM Address" value="No wallet" />
+						)}
 						<MetaPill
 							label="Registry"
-							value={DEFAULT_REGISTRY_ADDRESS ? `${DEFAULT_REGISTRY_ADDRESS.toString().slice(0, 4)}...${DEFAULT_REGISTRY_ADDRESS.toString().slice(-4)}` : "Unset"}
+							value={
+								DEFAULT_REGISTRY_ADDRESS
+									? `${DEFAULT_REGISTRY_ADDRESS.toString().slice(0, 4)}...${DEFAULT_REGISTRY_ADDRESS.toString().slice(-4)}`
+									: "Unset"
+							}
 						/>
 					</div>
 				</div>

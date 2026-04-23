@@ -110,7 +110,9 @@ export function useSubstrateSession() {
 
 	const availableWallets = useMemo(() => {
 		try {
-			return getInjectedExtensions().filter((walletName) => walletName !== SpektrExtensionName);
+			return getInjectedExtensions().filter(
+				(walletName) => walletName !== SpektrExtensionName,
+			);
 		} catch {
 			return [];
 		}
@@ -127,8 +129,8 @@ export function useSubstrateSession() {
 			? canUseDevSigner
 				? "dev"
 				: null
-			: preferredSource ??
-				(canUseDevSigner ? "dev" : browserAccounts.length > 0 ? "browser" : null);
+			: (preferredSource ??
+				(canUseDevSigner ? "dev" : browserAccounts.length > 0 ? "browser" : null));
 	const selectedBrowserAccountIndex =
 		browserAccounts.length === 0
 			? 0
@@ -157,8 +159,10 @@ export function useSubstrateSession() {
 	useEffect(() => {
 		const saved = localStorage.getItem("connected-extension-wallet");
 		if (saved && !connectedWallet) {
-			connectBrowserWallet(saved).catch(() => {
-				localStorage.removeItem("connected-extension-wallet");
+			queueMicrotask(() => {
+				connectBrowserWallet(saved).catch(() => {
+					localStorage.removeItem("connected-extension-wallet");
+				});
 			});
 		}
 	}, [connectBrowserWallet]); // eslint-disable-line react-hooks/exhaustive-deps

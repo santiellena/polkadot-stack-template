@@ -20,7 +20,11 @@ export default function HomeRoute() {
 	const [repositoryInput, setRepositoryInput] = useState(DEFAULT_REPO_NAME);
 
 	const uniqueRepos = useMemo(
-		() => repos.filter((repo, index, all) => all.findIndex((candidate) => candidate.repoId === repo.repoId) === index),
+		() =>
+			repos.filter(
+				(repo, index, all) =>
+					all.findIndex((candidate) => candidate.repoId === repo.repoId) === index,
+			),
 		[repos],
 	);
 
@@ -40,11 +44,13 @@ export default function HomeRoute() {
 					<div className="space-y-5">
 						<div className="eyebrow">Registry Surface</div>
 						<div>
-							<h1 className="page-title">Read canonical repository state, not just project metadata.</h1>
+							<h1 className="page-title">
+								Read canonical repository state, not just project metadata.
+							</h1>
 							<p className="mt-3 max-w-3xl leading-relaxed text-text-secondary">
-								Aperio is a repository registry. Git manages history off-chain, Bulletin stores
-								bundles, and the contract records which commit is canonical. The web app
-								should foreground that sequence.
+								Aperio is a repository registry. Git manages history off-chain,
+								Bulletin stores bundles, and the contract records which commit is
+								canonical. The web app should foreground that sequence.
 							</p>
 						</div>
 						<div className="flex flex-wrap gap-3">
@@ -102,8 +108,8 @@ export default function HomeRoute() {
 						<div className="eyebrow">Lookup</div>
 						<h2 className="section-title mt-2">Open repository by slug</h2>
 						<p className="mt-1 text-sm text-text-secondary">
-							Enter `organization/repository`. The app derives the on-chain `bytes32` repo id
-							client-side and opens the canonical state view.
+							Enter `organization/repository`. The app derives the on-chain `bytes32`
+							repo id client-side and opens the canonical state view.
 						</p>
 					</div>
 					<div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
@@ -232,7 +238,8 @@ export default function HomeRoute() {
 												{formatEthAmount(repo.totalEarned)}
 											</div>
 											<div className="mt-1 text-xs text-emerald-300/80">
-												Visible payout history for contributors and reviewers.
+												Visible payout history for contributors and
+												reviewers.
 											</div>
 										</div>
 										<div className="rounded-2xl border border-amber-500/20 bg-amber-500/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
@@ -241,7 +248,8 @@ export default function HomeRoute() {
 												{formatEthAmount(repo.treasuryBalance)}
 											</div>
 											<div className="mt-1 text-xs text-amber-300/80">
-												Available funding currently sitting in the repo treasury.
+												Available funding currently sitting in the repo
+												treasury.
 											</div>
 										</div>
 									</div>
@@ -322,7 +330,9 @@ function FlowStep({
 			</div>
 			<div>
 				<div className="text-sm font-semibold text-text-primary">{title}</div>
-				<div className="mt-1 text-sm leading-relaxed text-text-secondary">{description}</div>
+				<div className="mt-1 text-sm leading-relaxed text-text-secondary">
+					{description}
+				</div>
 			</div>
 		</div>
 	);

@@ -87,12 +87,12 @@ export default function ConfigRoute() {
 		label: "Extension",
 	};
 
-	const spektrAccounts = browserAccounts.filter((a) =>
-		(a as { source?: string }).source === SpektrExtensionName,
+	const spektrAccounts = browserAccounts.filter(
+		(a) => (a as { source?: string }).source === SpektrExtensionName,
 	);
-	const extensionAccounts = connectedWallet ? browserAccounts.filter((a) =>
-		(a as { source?: string }).source !== SpektrExtensionName,
-	) : [];
+	const extensionAccounts = connectedWallet
+		? browserAccounts.filter((a) => (a as { source?: string }).source !== SpektrExtensionName)
+		: [];
 
 	const extensionWallets = availableWallets.filter((n) => n !== SpektrExtensionName);
 
@@ -159,10 +159,16 @@ export default function ConfigRoute() {
 							</button>
 						</div>
 						{extensionAccounts.length === 0 ? (
-							<p className="text-sm text-text-muted">No accounts found in this wallet.</p>
+							<p className="text-sm text-text-muted">
+								No accounts found in this wallet.
+							</p>
 						) : (
 							extensionAccounts.map((acc) => (
-								<AccountCard key={acc.address} account={acc} badge={extensionBadge} />
+								<AccountCard
+									key={acc.address}
+									account={acc}
+									badge={extensionBadge}
+								/>
 							))
 						)}
 					</div>

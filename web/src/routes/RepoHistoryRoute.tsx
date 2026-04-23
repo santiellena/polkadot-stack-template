@@ -3,7 +3,12 @@ import { keccak256 } from "viem";
 import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
 import { useRepoOverview } from "../features/repo/useRepoOverview";
-import { formatGitCommitHash, formatRepoTimestamp, shortenAddress, shortenHash } from "../lib/aperio";
+import {
+	formatGitCommitHash,
+	formatRepoTimestamp,
+	shortenAddress,
+	shortenHash,
+} from "../lib/aperio";
 
 export default function RepoHistoryRoute() {
 	const { organization, repository } = useParams();
@@ -36,8 +41,8 @@ export default function RepoHistoryRoute() {
 					<h1 className="page-title">Commit History</h1>
 					<p className="mt-2 text-text-secondary max-w-3xl">
 						Canonical history is derived from `RepoCreated` and `ProposalMerged` events.
-						That means the page reflects what the contract accepted as repository truth, not
-						every off-chain Git action.
+						That means the page reflects what the contract accepted as repository truth,
+						not every off-chain Git action.
 					</p>
 				</div>
 				<Link
@@ -57,7 +62,9 @@ export default function RepoHistoryRoute() {
 							contributor for merged proposals.
 						</p>
 					</div>
-					<div className="text-sm text-text-tertiary">{repo.commitList.length} entry(s)</div>
+					<div className="text-sm text-text-tertiary">
+						{repo.commitList.length} entry(s)
+					</div>
 				</div>
 
 				<div className="space-y-3">
@@ -69,7 +76,9 @@ export default function RepoHistoryRoute() {
 							<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 								<div className="space-y-2">
 									<div className="text-sm font-semibold text-text-primary">
-										{entry.type === "initial" ? "Initial HEAD" : "Merged Proposal"}
+										{entry.type === "initial"
+											? "Initial HEAD"
+											: "Merged Proposal"}
 									</div>
 									<div className="text-sm text-text-secondary font-mono">
 										{formatGitCommitHash(entry.commitHash)}

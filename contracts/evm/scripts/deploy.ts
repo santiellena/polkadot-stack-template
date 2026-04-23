@@ -75,11 +75,11 @@ async function main() {
 		throw new Error(`Deploy tx ${hash} did not create a contract`);
 	}
 
-	const treasuryAddress = await publicClient.readContract({
+	const treasuryAddress = (await publicClient.readContract({
 		address: receipt.contractAddress,
 		abi: artifact.abi,
 		functionName: "treasury",
-	}) as `0x${string}`;
+	})) as `0x${string}`;
 
 	console.log(`EVM AperioRepositoryRegistry deployed to: ${receipt.contractAddress}`);
 	console.log(`EVM AperioIncentivesTreasury deployed to: ${treasuryAddress}`);

@@ -19,7 +19,9 @@ export function useRepoList() {
 				}
 			} catch (cause) {
 				if (!cancelled) {
-					setError(cause instanceof Error ? cause.message : "Failed to load repositories");
+					setError(
+						cause instanceof Error ? cause.message : "Failed to load repositories",
+					);
 				}
 			} finally {
 				if (!cancelled) {

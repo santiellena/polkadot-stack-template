@@ -2,11 +2,36 @@ import type { Address, Hex } from "viem";
 
 export type RepoReadResult = readonly [Address, Hex, string, bigint, bigint];
 export type RepoMetadataReadResult = readonly [string, string];
-export type ProposalReadResult = readonly [Address, Hex, string, bigint, bigint, number, Hex, string];
+export type ProposalReadResult = readonly [
+	Address,
+	Hex,
+	string,
+	bigint,
+	bigint,
+	number,
+	Hex,
+	string,
+];
 export type RepoTimestampsReadResult = readonly [bigint, bigint, bigint, bigint];
-export type ProposalTimestampsReadResult = readonly [bigint, bigint, bigint, bigint, bigint, bigint];
+export type ProposalTimestampsReadResult = readonly [
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+];
 export type ReleaseRecordReadResult = readonly [string, Hex, string, bigint, bigint];
-export type RewardStatsReadResult = readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+export type RewardStatsReadResult = readonly [
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+	bigint,
+];
 
 export type RepoListItem = {
 	repoId: Hex;

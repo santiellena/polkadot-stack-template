@@ -37,11 +37,8 @@ export default function CreateProposalRoute() {
 		getWalletClientForWrite,
 	} = useWalletSession();
 
-	const {
-		browserAccounts,
-		selectedBrowserAccountIndex,
-		getBulletinSigner,
-	} = useSubstrateSession();
+	const { browserAccounts, selectedBrowserAccountIndex, getBulletinSigner } =
+		useSubstrateSession();
 	const wsUrl = useChainStore((s) => s.wsUrl);
 	const substrateAccount = browserAccounts[selectedBrowserAccountIndex] ?? null;
 	const substrateH160: `0x${string}` | null = substrateAccount
@@ -239,9 +236,7 @@ export default function CreateProposalRoute() {
 				args: [repoId, proposedCommitBytes32, effectiveCid],
 			});
 
-			navigate(
-				`/repo/${encodeURIComponent(organization)}/${encodeURIComponent(repository)}`,
-			);
+			navigate(`/repo/${encodeURIComponent(organization)}/${encodeURIComponent(repository)}`);
 		} catch (cause) {
 			setStatus(cause instanceof Error ? cause.message : "Proposal submission failed");
 		} finally {
@@ -274,15 +269,16 @@ export default function CreateProposalRoute() {
 							<span className="font-mono text-text-primary">
 								{organization}/{repository}
 							</span>{" "}
-							uses a contributor whitelist, your EVM account must hold that role. Create a
-							self-contained bundle with{" "}
-							<span className="font-mono">git bundle create changes.bundle HEAD</span> — the
-							commit you enter below must be the HEAD of that bundle.
+							uses a contributor whitelist, your EVM account must hold that role.
+							Create a self-contained bundle with{" "}
+							<span className="font-mono">git bundle create changes.bundle HEAD</span>{" "}
+							— the commit you enter below must be the HEAD of that bundle.
 						</>
 					) : (
 						<>
-							Direct CID mode: supply a CID from an external Bulletin upload. The bundle
-							must already be stored on the Bulletin Chain before the maintainer can merge.
+							Direct CID mode: supply a CID from an external Bulletin upload. The
+							bundle must already be stored on the Bulletin Chain before the
+							maintainer can merge.
 						</>
 					)}
 				</div>
@@ -344,12 +340,15 @@ export default function CreateProposalRoute() {
 								<input
 									type="file"
 									accept=".bundle,application/octet-stream"
-									onChange={(event) => void handleBundleSelected(event.target.files?.[0])}
+									onChange={(event) =>
+										void handleBundleSelected(event.target.files?.[0])
+									}
 									className="input-field w-full file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-sm file:text-text-primary"
 								/>
 								<p className="mt-2 text-xs text-text-tertiary">
-									Bundle must include all commits reachable from your proposed HEAD so
-									the maintainer can merge locally without fetching from any remote.
+									Bundle must include all commits reachable from your proposed
+									HEAD so the maintainer can merge locally without fetching from
+									any remote.
 								</p>
 							</div>
 						) : (
@@ -362,7 +361,8 @@ export default function CreateProposalRoute() {
 									className="input-field w-full font-mono"
 								/>
 								<p className="mt-2 text-xs text-text-tertiary">
-									CID of a bundle already uploaded externally to the Bulletin chain.
+									CID of a bundle already uploaded externally to the Bulletin
+									chain.
 								</p>
 							</div>
 						)}
@@ -375,7 +375,7 @@ export default function CreateProposalRoute() {
 						<div className="mt-3">Bundle CID</div>
 						<div className="mt-1 font-mono break-all text-text-primary">
 							{cidMode === "direct"
-								? (directCid.trim() || "Enter a CID above")
+								? directCid.trim() || "Enter a CID above"
 								: (bundleCid ?? "Select a .bundle file to derive the CID")}
 						</div>
 					</div>
@@ -397,7 +397,7 @@ export default function CreateProposalRoute() {
 								? `${sourceLabel}: ${shortenAddress(account)}`
 								: substrateH160
 									? `Substrate: ${shortenAddress(substrateH160)}`
-								: "Not connected"
+									: "Not connected"
 						}
 					/>
 					{canUseDevSigner ? (
@@ -434,7 +434,9 @@ export default function CreateProposalRoute() {
 									? "Checking Bulletin authorization..."
 									: null}
 								{authorizationState === "authorized" ? authorizationMessage : null}
-								{authorizationState === "unauthorized" ? authorizationMessage : null}
+								{authorizationState === "unauthorized"
+									? authorizationMessage
+									: null}
 							</div>
 						</>
 					) : null}
@@ -455,10 +457,18 @@ export default function CreateProposalRoute() {
 					{cidMode === "upload" ? (
 						<>
 							<ValueLine label="Bundle File" value={bundleName ?? "Not selected"} />
-							<ValueLine label="Bundle Hash" value={bundleHash ?? "Not computed"} mono />
+							<ValueLine
+								label="Bundle Hash"
+								value={bundleHash ?? "Not computed"}
+								mono
+							/>
 						</>
 					) : (
-						<ValueLine label="Bundle CID" value={directCid.trim() || "Not entered"} mono />
+						<ValueLine
+							label="Bundle CID"
+							value={directCid.trim() || "Not entered"}
+							mono
+						/>
 					)}
 				</div>
 				<button

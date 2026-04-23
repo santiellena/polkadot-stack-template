@@ -13,8 +13,8 @@ export default function LeaderboardRoute() {
 				<h1 className="page-title">Global Leaderboard</h1>
 				<p className="text-text-secondary max-w-3xl">
 					This leaderboard is derived client-side from treasury reward and claim events.
-					It ranks accounts across every discovered repository treasury without storing any
-					ranking state on-chain.
+					It ranks accounts across every discovered repository treasury without storing
+					any ranking state on-chain.
 				</p>
 			</section>
 
@@ -24,8 +24,8 @@ export default function LeaderboardRoute() {
 				<div>
 					<h2 className="section-title">Contributors And Reviewers</h2>
 					<p className="text-sm text-text-secondary mt-1">
-						Contribution and review counts are inferred from reward accruals and proposal
-						ownership, not from an external indexer.
+						Contribution and review counts are inferred from reward accruals and
+						proposal ownership, not from an external indexer.
 					</p>
 				</div>
 

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { encodeFunctionData, isAddress, keccak256, parseUnits, type Abi, type Address, type Hex } from "viem";
+import {
+	encodeFunctionData,
+	isAddress,
+	keccak256,
+	parseUnits,
+	type Abi,
+	type Address,
+	type Hex,
+} from "viem";
 import { ZERO_ADDRESS } from "../config/aperio";
 import { getPublicClient } from "../config/evm";
 import { getStoredEthRpcUrl } from "../config/network";
@@ -41,8 +49,14 @@ function parseOptionalEthAmount(value: string, label: string, decimals = 18) {
 
 export default function CreateRepoRoute() {
 	const navigate = useNavigate();
-	const { account, sourceLabel, canUseDevSigner, devAccountIndex, selectDevAccount, getWalletClientForWrite } =
-		useWalletSession();
+	const {
+		account,
+		sourceLabel,
+		canUseDevSigner,
+		devAccountIndex,
+		selectDevAccount,
+		getWalletClientForWrite,
+	} = useWalletSession();
 	const {
 		availableWallets,
 		browserAccounts,
@@ -276,7 +290,13 @@ export default function CreateRepoRoute() {
 				address: registryAddress,
 				abi: aperioRegistryAbi as Abi,
 				functionName: "createRepo",
-				args: [normalizedOrganization, normalizedRepository, headCommitBytes32, effectiveCid, permissionlessContributions],
+				args: [
+					normalizedOrganization,
+					normalizedRepository,
+					headCommitBytes32,
+					effectiveCid,
+					permissionlessContributions,
+				],
 			});
 
 			if (!permissionlessContributions) {
@@ -356,8 +376,9 @@ export default function CreateRepoRoute() {
 					<div>
 						<h1 className="page-title">Create Repository</h1>
 						<p className="mt-2 max-w-3xl text-text-secondary">
-							Create an Aperio repository from the web by uploading the canonical Git bundle,
-							deriving its CID, and submitting the initial `HEAD` to the registry.
+							Create an Aperio repository from the web by uploading the canonical Git
+							bundle, deriving its CID, and submitting the initial `HEAD` to the
+							registry.
 						</p>
 					</div>
 					<Link to="/" className="btn-secondary">
@@ -443,11 +464,14 @@ export default function CreateRepoRoute() {
 								<input
 									type="file"
 									accept=".bundle,application/octet-stream"
-									onChange={(event) => void handleBundleSelected(event.target.files?.[0])}
+									onChange={(event) =>
+										void handleBundleSelected(event.target.files?.[0])
+									}
 									className="input-field w-full file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-sm file:text-text-primary"
 								/>
 								<p className="mt-2 text-xs text-text-tertiary">
-									From the repository root: `git bundle create repo.bundle HEAD`. The commit entered above must be the bundle `HEAD`.
+									From the repository root: `git bundle create repo.bundle HEAD`.
+									The commit entered above must be the bundle `HEAD`.
 								</p>
 							</div>
 						) : (
@@ -460,7 +484,8 @@ export default function CreateRepoRoute() {
 									className="input-field w-full font-mono"
 								/>
 								<p className="mt-2 text-xs text-text-tertiary">
-									CID of a bundle already uploaded externally to the Bulletin chain.
+									CID of a bundle already uploaded externally to the Bulletin
+									chain.
 								</p>
 							</div>
 						)}
@@ -471,10 +496,14 @@ export default function CreateRepoRoute() {
 							<input
 								type="checkbox"
 								checked={permissionlessContributions}
-								onChange={(event) => setPermissionlessContributions(event.target.checked)}
+								onChange={(event) =>
+									setPermissionlessContributions(event.target.checked)
+								}
 								className="h-4 w-4 accent-accent-blue"
 							/>
-							<span className="text-sm text-text-primary">Allow anyone to contribute</span>
+							<span className="text-sm text-text-primary">
+								Allow anyone to contribute
+							</span>
 						</label>
 						<p className="text-xs text-text-tertiary">
 							{permissionlessContributions
@@ -511,7 +540,9 @@ export default function CreateRepoRoute() {
 									<button
 										type="button"
 										onClick={() =>
-											setContributors((prev) => prev.filter((_, i) => i !== index))
+											setContributors((prev) =>
+												prev.filter((_, i) => i !== index),
+											)
 										}
 										className="btn-secondary px-3"
 									>
@@ -521,7 +552,8 @@ export default function CreateRepoRoute() {
 							))}
 							{contributors.length === 0 && (
 								<p className="text-xs text-text-tertiary">
-									No contributors added. Add at least one address to allow proposal submissions.
+									No contributors added. Add at least one address to allow
+									proposal submissions.
 								</p>
 							)}
 						</div>
@@ -535,8 +567,8 @@ export default function CreateRepoRoute() {
 						<div className="mt-3">Bundle CID</div>
 						<div className="mt-1 font-mono break-all text-text-primary">
 							{cidMode === "direct"
-								? (directCid.trim() || "Enter a CID above")
-								: (bundleCid || "Select a .bundle file to derive the CID")}
+								? directCid.trim() || "Enter a CID above"
+								: bundleCid || "Select a .bundle file to derive the CID"}
 						</div>
 					</div>
 				</div>
@@ -545,8 +577,8 @@ export default function CreateRepoRoute() {
 					<div>
 						<h2 className="section-title">Signers</h2>
 						<p className="mt-1 text-sm text-text-secondary">
-							Bulletin upload uses a Substrate signer. Repository creation and configuration
-							use the connected wallet session.
+							Bulletin upload uses a Substrate signer. Repository creation and
+							configuration use the connected wallet session.
 						</p>
 					</div>
 					<ValueLine
@@ -599,10 +631,16 @@ export default function CreateRepoRoute() {
 								/>
 							</div>
 							<div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-text-secondary">
-								{authorizationState === "idle" ? "Select a bundle to check Bulletin authorization." : null}
-								{authorizationState === "checking" ? "Checking Bulletin authorization..." : null}
+								{authorizationState === "idle"
+									? "Select a bundle to check Bulletin authorization."
+									: null}
+								{authorizationState === "checking"
+									? "Checking Bulletin authorization..."
+									: null}
 								{authorizationState === "authorized" ? authorizationMessage : null}
-								{authorizationState === "unauthorized" ? authorizationMessage : null}
+								{authorizationState === "unauthorized"
+									? authorizationMessage
+									: null}
 							</div>
 						</>
 					) : null}
@@ -634,9 +672,10 @@ export default function CreateRepoRoute() {
 					<div>
 						<h2 className="section-title">Treasury Configuration</h2>
 						<p className="mt-1 text-sm text-text-secondary">
-							These values are fixed PAS payouts, not percentages. They do not need to add
-							up to 100. After each accepted merge, the configured contributor reward is
-							accrued once and the reviewer reward is accrued for each approved reviewer.
+							These values are fixed PAS payouts, not percentages. They do not need to
+							add up to 100. After each accepted merge, the configured contributor
+							reward is accrued once and the reviewer reward is accrued for each
+							approved reviewer.
 						</p>
 					</div>
 					<div className="grid gap-3 md:grid-cols-2">
@@ -671,8 +710,8 @@ export default function CreateRepoRoute() {
 							className="input-field w-full"
 						/>
 						<p className="mt-2 text-xs text-text-tertiary">
-							Funding is optional, but rewards cannot be claimed until the treasury has
-							enough balance.
+							Funding is optional, but rewards cannot be claimed until the treasury
+							has enough balance.
 						</p>
 					</div>
 				</div>
@@ -692,10 +731,18 @@ export default function CreateRepoRoute() {
 					{cidMode === "upload" ? (
 						<>
 							<ValueLine label="Bundle File" value={bundleName || "Not selected"} />
-							<ValueLine label="Bundle Hash" value={bundleHash || "Not computed"} mono />
+							<ValueLine
+								label="Bundle Hash"
+								value={bundleHash || "Not computed"}
+								mono
+							/>
 						</>
 					) : (
-						<ValueLine label="Bundle CID" value={directCid.trim() || "Not entered"} mono />
+						<ValueLine
+							label="Bundle CID"
+							value={directCid.trim() || "Not entered"}
+							mono
+						/>
 					)}
 				</div>
 				<button

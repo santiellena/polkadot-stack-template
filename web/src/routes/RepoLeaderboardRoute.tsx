@@ -1,6 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 import { keccak256 } from "viem";
-import { LeaderboardSummaryCards, LeaderboardTable } from "../features/leaderboard/LeaderboardTable";
+import {
+	LeaderboardSummaryCards,
+	LeaderboardTable,
+} from "../features/leaderboard/LeaderboardTable";
 import { useRepoLeaderboard } from "../features/leaderboard/useLeaderboards";
 import { useSubstrateSession } from "../features/auth/useSubstrateSession";
 import { useWalletSession } from "../features/auth/useWalletSession";
@@ -15,17 +18,22 @@ export default function RepoLeaderboardRoute() {
 		? (`0x${keccak256(substrateAccount.polkadotSigner.publicKey).slice(-40)}` as `0x${string}`)
 		: null;
 	const effectiveAccount = substrateH160 ?? account;
-	const { repo, loading: repoLoading, error: repoError } = useRepoOverview(
-		organization,
-		repository,
-		effectiveAccount,
-	);
+	const {
+		repo,
+		loading: repoLoading,
+		error: repoError,
+	} = useRepoOverview(organization, repository, effectiveAccount);
 	const {
 		entries,
 		summary,
 		loading: leaderboardLoading,
 		error: leaderboardError,
-	} = useRepoLeaderboard(repo?.repoId, repo?.organization, repo?.repository, repo?.treasuryAddress);
+	} = useRepoLeaderboard(
+		repo?.repoId,
+		repo?.organization,
+		repo?.repository,
+		repo?.treasuryAddress,
+	);
 
 	if (repoLoading) {
 		return <div className="card animate-pulse h-40" />;
@@ -35,7 +43,9 @@ export default function RepoLeaderboardRoute() {
 		return (
 			<div className="card">
 				<h1 className="section-title">Leaderboard Unavailable</h1>
-				<p className="mt-3 text-sm text-accent-red">{repoError || "Repository not found"}</p>
+				<p className="mt-3 text-sm text-accent-red">
+					{repoError || "Repository not found"}
+				</p>
 			</div>
 		);
 	}

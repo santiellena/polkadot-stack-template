@@ -78,7 +78,9 @@ export function useWalletSession(): WalletSessionState {
 		void syncAccounts();
 
 		const handleAccountsChanged = (accounts: unknown) => {
-			const nextAccount = Array.isArray(accounts) ? ((accounts[0] as Address | undefined) ?? null) : null;
+			const nextAccount = Array.isArray(accounts)
+				? ((accounts[0] as Address | undefined) ?? null)
+				: null;
 			setBrowserAccount(nextAccount);
 		};
 
@@ -104,7 +106,11 @@ export function useWalletSession(): WalletSessionState {
 			account,
 			source,
 			sourceLabel:
-				source === "browser" ? "Browser wallet" : source === "dev" ? "Dev signer" : "No wallet",
+				source === "browser"
+					? "Browser wallet"
+					: source === "dev"
+						? "Dev signer"
+						: "No wallet",
 			devAccountIndex,
 			canUseBrowserWallet,
 			canUseDevSigner: localDevSignerEnabled,
@@ -130,6 +136,13 @@ export function useWalletSession(): WalletSessionState {
 				return getWalletClient(devAccountIndex, getStoredEthRpcUrl());
 			},
 		}),
-		[account, browserAccount, canUseBrowserWallet, devAccountIndex, localDevSignerEnabled, source],
+		[
+			account,
+			browserAccount,
+			canUseBrowserWallet,
+			devAccountIndex,
+			localDevSignerEnabled,
+			source,
+		],
 	);
 }

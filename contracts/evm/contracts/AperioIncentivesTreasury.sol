@@ -215,7 +215,10 @@ contract AperioIncentivesTreasury {
 		return repoParticipants[repoId][index];
 	}
 
-	function getRepoRewardStats(bytes32 repoId, address account)
+	function getRepoRewardStats(
+		bytes32 repoId,
+		address account
+	)
 		external
 		view
 		returns (
@@ -251,7 +254,9 @@ contract AperioIncentivesTreasury {
 		return globalParticipants[index];
 	}
 
-	function getGlobalRewardStats(address account)
+	function getGlobalRewardStats(
+		address account
+	)
 		external
 		view
 		returns (
@@ -286,7 +291,12 @@ contract AperioIncentivesTreasury {
 		emit ClaimAccrued(repoId, proposalId, who, amount);
 	}
 
-	function _recordReward(bytes32 repoId, address who, uint256 amount, bool isContribution) private {
+	function _recordReward(
+		bytes32 repoId,
+		address who,
+		uint256 amount,
+		bool isContribution
+	) private {
 		RewardStats storage repoStats = rewardStatsByRepo[repoId][who];
 		RewardStats storage globalStats = globalRewardStats[who];
 		uint64 rewardedAt = uint64(block.timestamp);

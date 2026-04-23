@@ -102,11 +102,7 @@ export function createMemFs() {
 			return node.data;
 		},
 
-		async writeFile(
-			path: string,
-			data: Uint8Array | string,
-			_opts?: unknown,
-		): Promise<void> {
+		async writeFile(path: string, data: Uint8Array | string): Promise<void> {
 			const p = normalize(path);
 			// Auto-create missing parent directories (mirrors LightningFS implicit-dir behaviour).
 			const lastSlash = p.lastIndexOf("/");
@@ -145,10 +141,7 @@ export function createMemFs() {
 			return names;
 		},
 
-		async mkdir(
-			path: string,
-			opts?: { recursive?: boolean } | number,
-		): Promise<void> {
+		async mkdir(path: string, opts?: { recursive?: boolean } | number): Promise<void> {
 			const p = normalize(path);
 			const recursive =
 				typeof opts === "object" && !!(opts as { recursive?: boolean }).recursive;

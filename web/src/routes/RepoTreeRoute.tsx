@@ -59,14 +59,23 @@ export default function RepoTreeRoute() {
 				<div>
 					<h2 className="section-title">Bundle Browser Unavailable</h2>
 					<p className="mt-2 text-sm text-text-secondary">
-						The in-browser repository tree is temporarily disabled in this build. You can
-						still inspect the canonical commit and download the canonical bundle directly.
+						The in-browser repository tree is temporarily disabled in this build. You
+						can still inspect the canonical commit and download the canonical bundle
+						directly.
 					</p>
 				</div>
 
 				<div className="grid gap-3 md:grid-cols-2">
-					<ValuePanel label="Canonical Commit" value={formatGitCommitHash(repo.latestCommitHash)} mono />
-					<ValuePanel label="Canonical CID" value={repo.latestCid || "Not recorded"} mono />
+					<ValuePanel
+						label="Canonical Commit"
+						value={formatGitCommitHash(repo.latestCommitHash)}
+						mono
+					/>
+					<ValuePanel
+						label="Canonical CID"
+						value={repo.latestCid || "Not recorded"}
+						mono
+					/>
 				</div>
 
 				{bundleUrl ? (
