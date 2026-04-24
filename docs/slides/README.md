@@ -1,6 +1,13 @@
 # Aperio Presentation
 
-Five-slide `reveal-md` deck for the Aperio presentation.
+`reveal-md` deck for the Aperio presentation. The deck is intentionally short:
+problem, product, market, demo handoff, stack learnings, next steps, Q&A.
+
+The expected live URL for the pitch is:
+
+```text
+https://aperio.dot.li/
+```
 
 ## Run locally
 
