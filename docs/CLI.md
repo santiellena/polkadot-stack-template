@@ -17,6 +17,9 @@ The current implementation is more explicit. Users create a Git bundle, pass it 
 `aperio`, and sign the resulting Polkadot Hub / `pallet-revive` calls with a
 configured SURI.
 
+The CLI is a supporting developer surface, not the required frontend for the
+project rubric. The required frontend is the static web app in `web/`.
+
 ---
 
 ## Implemented Command Set
@@ -43,6 +46,8 @@ Not implemented in the CLI yet:
 - `aperio fetch <proposalId>`
 - `aperio release <version>`
 - `aperio status`, `aperio repo`, and `aperio proposals`
+- automatic verification that a submitted commit exists inside the provided bundle
+- interactive confirmations before every write transaction
 
 ---
 
@@ -143,6 +148,16 @@ Internally, that target flow would:
 
 The target production signer should request signatures from a wallet instead of
 persisting private key material.
+
+## Current Trust Boundary
+
+The CLI computes the bundle CID from the bytes it uploads, and it can infer a
+commit from a local Git repository. It does not yet prove that the inferred or
+provided commit is actually contained in the uploaded bundle. That check is part
+of the off-chain reviewer responsibility in the MVP.
+
+A stronger CLI should run `git bundle verify`, inspect bundle heads, and fail if
+the declared commit cannot be reconstructed from the provided artifact.
 
 ---
 

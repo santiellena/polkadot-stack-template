@@ -1,0 +1,14 @@
+{
+  "name": "aperio-slides",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "reveal-md slides.md --theme black --css theme.css --watch",
+    "preview": "reveal-md slides.md --theme black --css theme.css",
+    "export": "reveal-md slides.md --theme black --css theme.css --static dist"
+  },
+  "devDependencies": {
+    "reveal-md": "^6.1.4"
+  }
+}

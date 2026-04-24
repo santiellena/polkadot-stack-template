@@ -1,0 +1,11 @@
+{
+  "hash": true,
+  "controls": false,
+  "progress": true,
+  "center": true,
+  "transition": "fade",
+  "backgroundTransition": "fade",
+  "width": 1280,
+  "height": 720,
+  "margin": 0.05
+}

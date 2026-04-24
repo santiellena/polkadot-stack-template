@@ -2,6 +2,12 @@
 
 This guide covers the remaining deployable Aperio surfaces: contracts and frontend.
 
+Current public deployment used for the presentation:
+
+```text
+https://aperio.dot.li/
+```
+
 ## Contracts
 
 Target: Paseo (`420420417`).
@@ -40,20 +46,22 @@ npm run build
 Deploy locally through Bulletin/IPFS:
 
 ```bash
-./scripts/deploy-frontend.sh --domain aperio00.dot
+./scripts/deploy-frontend.sh --domain aperio.dot
 ```
 
 Equivalent Makefile target:
 
 ```bash
-make deploy-frontend DOMAIN=aperio00.dot
+make deploy-frontend DOMAIN=aperio.dot
 ```
 
 Deploy through GitHub Actions (recommended path):
 
 1. Open `Actions`.
 2. Run `Deploy Frontend to DotNS`.
-3. Provide a DotNS basename.
+3. Provide the DotNS basename. For `https://aperio.dot.li/`, the basename is `aperio`.
+
+The GitHub Action builds `web/`, exports an IPFS CAR, uploads it to Bulletin, then registers/updates the DotNS content hash.
 
 ## Required Secrets
 
@@ -72,3 +80,15 @@ Set these when building hosted releases:
 - `VITE_ETH_RPC_URL`
 
 The checked-in defaults target the current test deployment.
+
+## Pre-Submit Checks
+
+Run these before a final deployment:
+
+```bash
+cd web && npm run build && npm run lint && npm run fmt:check
+cd contracts/evm && npm test && npm run fmt:check
+cd contracts/pvm && npm test && npm run fmt:check
+```
+
+After deploying, open the DotNS URL from a fresh browser profile or private window and verify that repository reads, wallet connection, and bundle download links use the intended Paseo endpoints.
